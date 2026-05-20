@@ -36,25 +36,27 @@ const aesResult = computed(() => {
 
 // SM2
 const sm2Text = ref('Hello SM2')
-const sm2Keys = ref<{ publicKey: string; privateKey: string } | null>(null)
-function genSm2Keys() {
-  sm2Keys.value = sm2.generateKeyPairHex()
-}
+const sm2PubKey = ref('')
+const sm2PriKey = ref('')
 const sm2Mode = ref<'encrypt' | 'decrypt' | 'sign' | 'verify'>('encrypt')
 const sm2Result = computed(() => {
-  if (!sm2Text.value || !sm2Keys.value) return ''
+  if (!sm2Text.value) return ''
   try {
     if (sm2Mode.value === 'encrypt') {
-      return sm2.doEncrypt(sm2Text.value, sm2Keys.value.publicKey, 1)
+      if (!sm2PubKey.value) return '请输入公钥'
+      return sm2.doEncrypt(sm2Text.value, sm2PubKey.value, 1)
     } else if (sm2Mode.value === 'decrypt') {
-      return sm2.doDecrypt(sm2Text.value, sm2Keys.value.privateKey, 1) || '解密失败'
+      if (!sm2PriKey.value) return '请输入私钥'
+      return sm2.doDecrypt(sm2Text.value, sm2PriKey.value, 1) || '解密失败'
     } else if (sm2Mode.value === 'sign') {
-      return sm2.doSignature(sm2Text.value, sm2Keys.value.privateKey)
+      if (!sm2PriKey.value) return '请输入私钥'
+      return sm2.doSignature(sm2Text.value, sm2PriKey.value)
     } else {
+      if (!sm2PubKey.value) return '请输入公钥'
       const sig = sm2Text.value.split('||')[1] || ''
       const msg = sm2Text.value.split('||')[0] || ''
       if (!sig || !msg) return '格式：消息||签名'
-      const ok = sm2.doVerifySignature(msg, sig, sm2Keys.value.publicKey)
+      const ok = sm2.doVerifySignature(msg, sig, sm2PubKey.value)
       return ok ? '✅ 签名验证通过' : '❌ 签名验证失败'
     }
   } catch {
@@ -62,32 +64,40 @@ const sm2Result = computed(() => {
   }
 })
 
+function genSm2Keys() {
+  const keys = sm2.generateKeyPairHex()
+  sm2PubKey.value = keys.publicKey
+  sm2PriKey.value = keys.privateKey
+}
+
 // RSA
 const rsaText = ref('Hello RSA')
-const rsaKeys = ref<{ pub: string; pri: string } | null>(null)
-function genRsaKeys() {
-  const encrypt = new JSEncrypt({ default_key_size: '2048' })
-  rsaKeys.value = {
-    pub: encrypt.getPublicKey(),
-    pri: encrypt.getPrivateKey(),
-  }
-}
+const rsaPubKey = ref('')
+const rsaPriKey = ref('')
 const rsaMode = ref<'encrypt' | 'decrypt'>('encrypt')
 const rsaResult = computed(() => {
-  if (!rsaText.value || !rsaKeys.value) return ''
+  if (!rsaText.value) return ''
   try {
     const crypt = new JSEncrypt()
     if (rsaMode.value === 'encrypt') {
-      crypt.setPublicKey(rsaKeys.value.pub)
+      if (!rsaPubKey.value) return '请输入公钥'
+      crypt.setPublicKey(rsaPubKey.value)
       return crypt.encrypt(rsaText.value) || '加密失败'
     } else {
-      crypt.setPrivateKey(rsaKeys.value.pri)
+      if (!rsaPriKey.value) return '请输入私钥'
+      crypt.setPrivateKey(rsaPriKey.value)
       return crypt.decrypt(rsaText.value) || '解密失败'
     }
   } catch {
     return '操作失败'
   }
 })
+
+function genRsaKeys() {
+  const encrypt = new JSEncrypt({ default_key_size: '2048' })
+  rsaPubKey.value = encrypt.getPublicKey()
+  rsaPriKey.value = encrypt.getPrivateKey()
+}
 
 // JWT
 const jwtToken = ref('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c')
@@ -180,15 +190,9 @@ const sm4Result = computed(() => {
         <RefreshCw class="h-4 w-4" />
         生成密钥对
       </button>
-      <div v-if="sm2Keys" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div class="rounded-xl bg-surface-variant/50 p-3">
-          <div class="text-xs text-on-surface-variant">公钥</div>
-          <div class="mt-1 break-all font-mono text-xs text-on-surface">{{ sm2Keys.publicKey }}</div>
-        </div>
-        <div class="rounded-xl bg-surface-variant/50 p-3">
-          <div class="text-xs text-on-surface-variant">私钥</div>
-          <div class="mt-1 break-all font-mono text-xs text-on-surface">{{ sm2Keys.privateKey }}</div>
-        </div>
+      <div class="grid grid-cols-1 gap-3">
+        <textarea v-model="sm2PubKey" placeholder="公钥" class="h-20 w-full resize-none rounded-xl border border-outline bg-surface p-3 text-xs font-mono text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+        <textarea v-model="sm2PriKey" placeholder="私钥" class="h-20 w-full resize-none rounded-xl border border-outline bg-surface p-3 text-xs font-mono text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
       </div>
       <div class="flex gap-3 flex-wrap">
         <div class="inline-flex rounded-full bg-surface-variant p-1">
@@ -215,15 +219,9 @@ const sm4Result = computed(() => {
         <RefreshCw class="h-4 w-4" />
         生成密钥对 (2048)
       </button>
-      <div v-if="rsaKeys" class="grid grid-cols-1 gap-3">
-        <div class="rounded-xl bg-surface-variant/50 p-3">
-          <div class="text-xs text-on-surface-variant">公钥</div>
-          <div class="mt-1 break-all font-mono text-xs text-on-surface">{{ rsaKeys.pub }}</div>
-        </div>
-        <div class="rounded-xl bg-surface-variant/50 p-3">
-          <div class="text-xs text-on-surface-variant">私钥</div>
-          <div class="mt-1 break-all font-mono text-xs text-on-surface">{{ rsaKeys.pri }}</div>
-        </div>
+      <div class="grid grid-cols-1 gap-3">
+        <textarea v-model="rsaPubKey" placeholder="公钥" class="h-24 w-full resize-none rounded-xl border border-outline bg-surface p-3 text-xs font-mono text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+        <textarea v-model="rsaPriKey" placeholder="私钥" class="h-24 w-full resize-none rounded-xl border border-outline bg-surface p-3 text-xs font-mono text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
       </div>
       <div class="flex gap-3">
         <div class="inline-flex rounded-full bg-surface-variant p-1">

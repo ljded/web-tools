@@ -6,12 +6,14 @@ import { copyToClipboard } from '@/utils/clipboard'
 
 const nowTs = ref(Math.floor(Date.now() / 1000))
 const nowMs = ref(Date.now())
+const nowDate = ref(dayjs().format('YYYY-MM-DD HH:mm:ss'))
 let timer: ReturnType<typeof setInterval>
 
 onMounted(() => {
   timer = setInterval(() => {
     nowTs.value = Math.floor(Date.now() / 1000)
     nowMs.value = Date.now()
+    nowDate.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
   }, 1000)
 })
 onUnmounted(() => clearInterval(timer))
@@ -41,7 +43,6 @@ const tzTo = ref('+00:00')
 const tzResult = computed(() => {
   const d = dayjs(tzDate.value)
   if (!d.isValid()) return null
-  // 简单处理：通过偏移量计算
   const parseOffset = (tz: string) => {
     const sign = tz.startsWith('-') ? -1 : 1
     const [h = 0, m = 0] = tz.replace('+', '').replace('-', '').split(':').map(Number)
@@ -88,6 +89,10 @@ async function copy(val: string) {
     <!-- 实时时间戳 -->
     <div class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant">
       <h3 class="mb-4 text-lg font-medium text-on-surface">实时时间戳</h3>
+      <div class="mb-4 rounded-xl bg-surface-variant/50 p-4">
+        <div class="text-xs text-on-surface-variant">本地时间</div>
+        <div class="mt-1 text-2xl font-medium text-on-surface">{{ nowDate }}</div>
+      </div>
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="rounded-xl bg-surface-variant/50 p-4">
           <div class="text-xs text-on-surface-variant">秒 (s)</div>

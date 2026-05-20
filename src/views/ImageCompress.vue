@@ -4,13 +4,10 @@ import imageCompression from 'browser-image-compression'
 import { Upload, Download, Image } from '@lucide/vue'
 
 const originalFile = ref<File | null>(null)
-const originalUrl = ref('')
-const compressedUrl = ref('')
 const compressedFile = ref<File | null>(null)
 const quality = ref(0.8)
 const maxWidth = ref(1920)
 const maxHeight = ref(1080)
-const lossless = ref(false)
 const loading = ref(false)
 
 const originalSize = computed(() => {
@@ -37,8 +34,6 @@ function handleFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   originalFile.value = file
-  originalUrl.value = URL.createObjectURL(file)
-  compressedUrl.value = ''
   compressedFile.value = null
 }
 
@@ -52,34 +47,13 @@ async function compress() {
   if (!originalFile.value) return
   loading.value = true
   try {
-    if (lossless.value) {
-      // 无损：仅限制尺寸，使用 canvas 重新绘制为 PNG
-      const img = document.createElement('img')
-      img.src = originalUrl.value
-      await new Promise((res) => { img.onload = res })
-      const canvas = document.createElement('canvas')
-      let w = img.naturalWidth
-      let h = img.naturalHeight
-      if (w > maxWidth.value) { h = Math.round(h * maxWidth.value / w); w = maxWidth.value }
-      if (h > maxHeight.value) { w = Math.round(w * maxHeight.value / h); h = maxHeight.value }
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')!
-      ctx.drawImage(img, 0, 0, w, h)
-      const blob = await new Promise<Blob>((res) => canvas.toBlob((b) => res(b!), 'image/png'))
-      compressedFile.value = new File([blob], originalFile.value.name.replace(/\.[^.]+$/, '.png'), { type: 'image/png' })
-      compressedUrl.value = URL.createObjectURL(compressedFile.value)
-    } else {
-      // 有损压缩
-      const options = {
-        maxWidthOrHeight: Math.max(maxWidth.value, maxHeight.value),
-        useWebWorker: true,
-        initialQuality: quality.value,
-      }
-      const file = await imageCompression(originalFile.value, options)
-      compressedFile.value = file
-      compressedUrl.value = URL.createObjectURL(file)
+    const options = {
+      maxWidthOrHeight: Math.max(maxWidth.value, maxHeight.value),
+      useWebWorker: true,
+      initialQuality: quality.value,
     }
+    const file = await imageCompression(originalFile.value, options)
+    compressedFile.value = file
   } catch (e: any) {
     alert('压缩失败: ' + (e.message || e))
   } finally {
@@ -88,11 +62,13 @@ async function compress() {
 }
 
 function download() {
-  if (!compressedUrl.value || !compressedFile.value) return
+  if (!compressedFile.value) return
+  const url = URL.createObjectURL(compressedFile.value)
   const link = document.createElement('a')
   link.download = compressedFile.value.name
-  link.href = compressedUrl.value
+  link.href = url
   link.click()
+  URL.revokeObjectURL(url)
 }
 </script>
 
@@ -132,17 +108,10 @@ function download() {
           <input v-model.number="maxHeight" type="number" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
         </div>
         <div>
-          <label class="mb-1 block text-sm text-on-surface-variant">质量 (有损)</label>
+          <label class="mb-1 block text-sm text-on-surface-variant">质量</label>
           <input v-model.number="quality" type="range" min="0.1" max="1" step="0.05" class="h-10 w-full" />
           <div class="text-right text-xs text-on-surface-variant">{{ (quality * 100).toFixed(0) }}%</div>
         </div>
-      </div>
-
-      <div class="flex items-center gap-3">
-        <label class="flex cursor-pointer items-center gap-2 text-sm text-on-surface">
-          <input v-model="lossless" type="checkbox" class="h-4 w-4 accent-primary" />
-          无损压缩 (转为 PNG，仅限制尺寸)
-        </label>
       </div>
 
       <div class="flex gap-3">
@@ -155,7 +124,7 @@ function download() {
           {{ loading ? '压缩中...' : '开始压缩' }}
         </button>
         <button
-          v-if="compressedUrl"
+          v-if="compressedFile"
           @click="download"
           class="flex items-center gap-2 rounded-full bg-secondary-container px-5 py-2.5 text-sm font-medium text-on-secondary-container hover:bg-secondary-container/80 transition-colors"
         >
@@ -164,19 +133,8 @@ function download() {
         </button>
       </div>
 
-      <div v-if="compressedUrl && ratio !== '-'" class="text-sm text-on-surface-variant">
+      <div v-if="compressedFile && ratio !== '-'" class="text-sm text-on-surface-variant">
         压缩率: <span class="font-medium text-primary">{{ ratio }}</span>
-      </div>
-    </div>
-
-    <div v-if="originalUrl || compressedUrl" class="grid grid-cols-1 gap-4 md:grid-cols-2">
-      <div class="rounded-2xl bg-surface p-4 shadow-sm outline outline-1 outline-outline-variant">
-        <div class="mb-2 text-sm font-medium text-on-surface-variant">原图</div>
-        <img v-if="originalUrl" :src="originalUrl" class="w-full rounded-xl object-contain" />
-      </div>
-      <div class="rounded-2xl bg-surface p-4 shadow-sm outline outline-1 outline-outline-variant">
-        <div class="mb-2 text-sm font-medium text-on-surface-variant">压缩后</div>
-        <img v-if="compressedUrl" :src="compressedUrl" class="w-full rounded-xl object-contain" />
       </div>
     </div>
   </div>

@@ -136,6 +136,10 @@ function goTo(path: string) {
         </div>
       </header>
 
+      <!-- 本地运行提示 -->
+      <div class="bg-primary-container px-4 py-2 text-center text-xs font-medium text-on-primary-container">
+        🔒 所有操作均在浏览器本地完成，数据不会上传到任何服务器
+      </div>
       <!-- 内容 -->
       <main class="flex-1 overflow-y-auto p-4 md:p-6">
         <slot />
