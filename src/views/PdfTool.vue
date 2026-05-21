@@ -17,7 +17,21 @@ const compressLoading = ref(false)
 
 function handleCompressFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) compressFile.value = file
+  if (file) setCompressFile(file)
+}
+
+function isPdfFile(file: File): boolean {
+  return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+}
+
+function setCompressFile(file: File) {
+  if (isPdfFile(file)) compressFile.value = file
+}
+
+function handleCompressDrop(e: DragEvent) {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (file) setCompressFile(file)
 }
 
 async function doCompress() {
@@ -55,9 +69,17 @@ function triggerMergeUpload() {
 }
 
 function handleMergeFiles(e: Event) {
-  const files = Array.from((e.target as HTMLInputElement).files || [])
-  const valid = files.filter((f) => f.type === 'application/pdf' || f.name.endsWith('.pdf'))
+  addMergeFiles(Array.from((e.target as HTMLInputElement).files || []))
+}
+
+function addMergeFiles(files: File[]) {
+  const valid = files.filter(isPdfFile)
   mergeFiles.value.push(...valid.map((f) => ({ file: f, name: f.name })))
+}
+
+function handleMergeDrop(e: DragEvent) {
+  e.preventDefault()
+  addMergeFiles(Array.from(e.dataTransfer?.files || []))
 }
 
 function removeMergeFile(idx: number) {
@@ -99,7 +121,17 @@ const splitLoading = ref(false)
 
 function handleSplitFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) splitFile.value = file
+  if (file) setSplitFile(file)
+}
+
+function setSplitFile(file: File) {
+  if (isPdfFile(file)) splitFile.value = file
+}
+
+function handleSplitDrop(e: DragEvent) {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (file) setSplitFile(file)
 }
 
 function parseRanges(input: string, total: number): number[][] {
@@ -153,7 +185,17 @@ const wmLoading = ref(false)
 
 function handleWmFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) wmFile.value = file
+  if (file) setWmFile(file)
+}
+
+function setWmFile(file: File) {
+  if (isPdfFile(file)) wmFile.value = file
+}
+
+function handleWmDrop(e: DragEvent) {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (file) setWmFile(file)
 }
 
 function hexToRgbTuple(hex: string) {
@@ -205,11 +247,20 @@ const tiResults = ref<{ url: string; idx: number }[]>([])
 
 function handleTiFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) {
-    tiFile.value = file
-    tiResults.value.forEach((r) => URL.revokeObjectURL(r.url))
-    tiResults.value = []
-  }
+  if (file) setTiFile(file)
+}
+
+function setTiFile(file: File) {
+  if (!isPdfFile(file)) return
+  tiFile.value = file
+  tiResults.value.forEach((r) => URL.revokeObjectURL(r.url))
+  tiResults.value = []
+}
+
+function handleTiDrop(e: DragEvent) {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (file) setTiFile(file)
 }
 
 async function doToImage() {
@@ -283,13 +334,18 @@ function pdfBytesToBlob(bytes: Uint8Array<ArrayBufferLike>): Blob {
 
     <!-- 压缩 -->
     <div v-if="activeTab === 'compress'" class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant space-y-4">
-      <div class="flex items-center gap-3">
+      <div
+        class="flex items-center gap-3 rounded-2xl border-2 border-dashed border-outline p-4 transition-colors hover:border-primary hover:bg-primary-container/20"
+        @dragover.prevent
+        @drop="handleCompressDrop"
+      >
         <label class="flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-on-primary shadow-sm hover:bg-primary/90 transition-colors">
           <Upload class="h-4 w-4" />
           选择 PDF
           <input type="file" accept=".pdf" class="hidden" @change="handleCompressFile" />
         </label>
         <span v-if="compressFile" class="text-sm text-on-surface">{{ compressFile.name }}</span>
+        <span v-else class="text-xs text-on-surface-variant">或拖拽 PDF 到此处</span>
       </div>
 
       <div class="rounded-xl bg-surface-variant/30 p-4 text-xs text-on-surface-variant">
@@ -331,11 +387,13 @@ function pdfBytesToBlob(bytes: Uint8Array<ArrayBufferLike>): Blob {
       <div class="flex items-center justify-center">
         <button
           @click="triggerMergeUpload"
+          @dragover.prevent
+          @drop="handleMergeDrop"
           class="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-outline p-8 transition-colors hover:border-primary hover:bg-primary-container/30"
         >
           <Upload class="h-8 w-8 text-primary" />
           <span class="text-sm font-medium text-on-surface">添加 PDF 文件</span>
-          <span class="text-xs text-on-surface-variant">可多次添加，按列表顺序合并</span>
+          <span class="text-xs text-on-surface-variant">可点击或拖拽多个 PDF，按列表顺序合并</span>
         </button>
         <input id="pdf-merge-upload" type="file" accept=".pdf" multiple class="hidden" @change="handleMergeFiles" />
       </div>
@@ -371,13 +429,18 @@ function pdfBytesToBlob(bytes: Uint8Array<ArrayBufferLike>): Blob {
 
     <!-- 拆分 -->
     <div v-if="activeTab === 'split'" class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant space-y-4">
-      <div class="flex items-center gap-3">
+      <div
+        class="flex items-center gap-3 rounded-2xl border-2 border-dashed border-outline p-4 transition-colors hover:border-primary hover:bg-primary-container/20"
+        @dragover.prevent
+        @drop="handleSplitDrop"
+      >
         <label class="flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-on-primary shadow-sm hover:bg-primary/90 transition-colors">
           <Upload class="h-4 w-4" />
           选择 PDF
           <input type="file" accept=".pdf" class="hidden" @change="handleSplitFile" />
         </label>
         <span v-if="splitFile" class="text-sm text-on-surface">{{ splitFile.name }}</span>
+        <span v-else class="text-xs text-on-surface-variant">或拖拽 PDF 到此处</span>
       </div>
 
       <div>
@@ -402,13 +465,18 @@ function pdfBytesToBlob(bytes: Uint8Array<ArrayBufferLike>): Blob {
 
     <!-- 水印 -->
     <div v-if="activeTab === 'watermark'" class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant space-y-4">
-      <div class="flex items-center gap-3">
+      <div
+        class="flex items-center gap-3 rounded-2xl border-2 border-dashed border-outline p-4 transition-colors hover:border-primary hover:bg-primary-container/20"
+        @dragover.prevent
+        @drop="handleWmDrop"
+      >
         <label class="flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-on-primary shadow-sm hover:bg-primary/90 transition-colors">
           <Upload class="h-4 w-4" />
           选择 PDF
           <input type="file" accept=".pdf" class="hidden" @change="handleWmFile" />
         </label>
         <span v-if="wmFile" class="text-sm text-on-surface">{{ wmFile.name }}</span>
+        <span v-else class="text-xs text-on-surface-variant">或拖拽 PDF 到此处</span>
       </div>
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -439,13 +507,18 @@ function pdfBytesToBlob(bytes: Uint8Array<ArrayBufferLike>): Blob {
 
     <!-- 转图片 -->
     <div v-if="activeTab === 'toImage'" class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant space-y-4">
-      <div class="flex items-center gap-3">
+      <div
+        class="flex items-center gap-3 rounded-2xl border-2 border-dashed border-outline p-4 transition-colors hover:border-primary hover:bg-primary-container/20"
+        @dragover.prevent
+        @drop="handleTiDrop"
+      >
         <label class="flex cursor-pointer items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-on-primary shadow-sm hover:bg-primary/90 transition-colors">
           <Upload class="h-4 w-4" />
           选择 PDF
           <input type="file" accept=".pdf" class="hidden" @change="handleTiFile" />
         </label>
         <span v-if="tiFile" class="text-sm text-on-surface">{{ tiFile.name }}</span>
+        <span v-else class="text-xs text-on-surface-variant">或拖拽 PDF 到此处</span>
       </div>
 
       <div>

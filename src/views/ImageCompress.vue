@@ -36,14 +36,27 @@ function formatSize(bytes: number): string {
 
 function handleFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
+  if (file) setImageFile(file)
+}
+
+function setImageFile(file: File) {
   error.value = ''
+  if (!file.type.startsWith('image/')) {
+    error.value = '请上传图片文件。'
+    return
+  }
   if (file.size > MAX_IMAGE_BYTES) {
     error.value = `图片超过 ${formatSize(MAX_IMAGE_BYTES)}，为避免浏览器卡顿已拒绝处理。`
     return
   }
   originalFile.value = file
   compressedFile.value = null
+}
+
+function handleDrop(e: DragEvent) {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (file) setImageFile(file)
 }
 
 function triggerUpload() {
@@ -89,10 +102,12 @@ function download() {
       <div class="flex items-center justify-center">
         <button
           @click="triggerUpload"
+          @dragover.prevent
+          @drop="handleDrop"
           class="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-outline p-8 transition-colors hover:border-primary hover:bg-primary-container/30"
         >
           <Upload class="h-8 w-8 text-primary" />
-          <span class="text-sm font-medium text-on-surface">点击上传图片</span>
+          <span class="text-sm font-medium text-on-surface">点击或拖拽上传图片</span>
           <span class="text-xs text-on-surface-variant">支持 JPG, PNG, WebP 等格式</span>
         </button>
         <input id="img-upload" type="file" accept="image/*" class="hidden" @change="handleFile" />

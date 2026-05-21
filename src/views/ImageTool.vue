@@ -75,8 +75,7 @@ function triggerUpload() {
   el?.click()
 }
 
-function handleFiles(e: Event) {
-  const fileList = Array.from((e.target as HTMLInputElement).files || [])
+function addFiles(fileList: File[]) {
   const valid = fileList.filter((f) => f.type.startsWith('image/'))
   valid.forEach((file) => {
     const reader = new FileReader()
@@ -85,6 +84,15 @@ function handleFiles(e: Event) {
     }
     reader.readAsDataURL(file)
   })
+}
+
+function handleFiles(e: Event) {
+  addFiles(Array.from((e.target as HTMLInputElement).files || []))
+}
+
+function handleDrop(e: DragEvent) {
+  e.preventDefault()
+  addFiles(Array.from(e.dataTransfer?.files || []))
 }
 
 function removeItem(idx: number) {
@@ -301,10 +309,12 @@ const batchOpLabel = computed(() => {
       <div class="flex items-center justify-center">
         <button
           @click="triggerUpload"
+          @dragover.prevent
+          @drop="handleDrop"
           class="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-outline p-8 transition-colors hover:border-primary hover:bg-primary-container/30"
         >
           <Upload class="h-8 w-8 text-primary" />
-          <span class="text-sm font-medium text-on-surface">点击上传图片</span>
+          <span class="text-sm font-medium text-on-surface">点击或拖拽上传图片</span>
           <span class="text-xs text-on-surface-variant">支持批量上传</span>
         </button>
         <input id="image-upload" type="file" accept="image/*" multiple class="hidden" @change="handleFiles" />

@@ -305,6 +305,13 @@ function handleFileUpload(e: Event) {
   setFile(file)
 }
 
+function handleFileDrop(e: DragEvent) {
+  e.preventDefault()
+  if (mode.value !== 'encode') return
+  const file = e.dataTransfer?.files?.[0]
+  if (file) setFile(file)
+}
+
 function setFile(f: File) {
   encodeError.value = ''
   if (f.size > MAX_FILE_ENCODE_BYTES) {
@@ -420,17 +427,23 @@ onUnmounted(() => {
       <div v-if="encodeError" class="mb-3 text-sm text-error">{{ encodeError }}</div>
 
       <!-- 文本输入 -->
-      <textarea
+      <div
         v-if="!uploadedFile"
-        v-model="input"
-        @blur="saveHistory"
-        :placeholder="
-          mode === 'encode'
-            ? '输入要编码的文本...'
-            : '输入要解码的 Base64（支持大图片直接粘贴）'
-        "
-        class="h-40 w-full resize-none rounded-xl border border-outline bg-surface p-4 text-sm text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
-      />
+        @dragover.prevent
+        @drop="handleFileDrop"
+      >
+        <textarea
+          v-model="input"
+          @blur="saveHistory"
+          :placeholder="
+            mode === 'encode'
+              ? '输入要编码的文本，或拖拽文件到此处...'
+              : '输入要解码的 Base64（支持大图片直接粘贴）'
+          "
+          class="h-40 w-full resize-none rounded-xl border border-outline bg-surface p-4 text-sm text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+          :class="mode === 'encode' ? 'border-dashed hover:border-primary hover:bg-primary-container/20' : ''"
+        />
+      </div>
 
       <!-- 文件卡片 -->
       <div

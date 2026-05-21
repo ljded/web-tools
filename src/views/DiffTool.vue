@@ -90,6 +90,10 @@ function swap() {
 
 function loadTextFile(e: Event, target: 'old' | 'new') {
   const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) setTextFile(file, target)
+}
+
+function setTextFile(file: File, target: 'old' | 'new') {
   if (!file) return
   const reader = new FileReader()
   reader.onload = () => {
@@ -97,6 +101,12 @@ function loadTextFile(e: Event, target: 'old' | 'new') {
     else newText.value = String(reader.result)
   }
   reader.readAsText(file)
+}
+
+function handleTextDrop(e: DragEvent, target: 'old' | 'new') {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (file) setTextFile(file, target)
 }
 
 // ===== 图片对比（保留原有逻辑） =====
@@ -107,6 +117,10 @@ const imgMode = ref<'side' | 'overlay'>('side')
 
 function handleImgUpload(e: Event, target: 'a' | 'b') {
   const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) setImgFile(file, target)
+}
+
+function setImgFile(file: File, target: 'a' | 'b') {
   if (!file) return
   const reader = new FileReader()
   reader.onload = () => {
@@ -114,6 +128,12 @@ function handleImgUpload(e: Event, target: 'a' | 'b') {
     else imgB.value = reader.result as string
   }
   reader.readAsDataURL(file)
+}
+
+function handleImgDrop(e: DragEvent, target: 'a' | 'b') {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (file) setImgFile(file, target)
 }
 
 function clearImg(target: 'a' | 'b') {
@@ -175,6 +195,9 @@ function clearImg(target: 'a' | 'b') {
       <div
         class="rounded-2xl bg-surface shadow-sm outline outline-1 outline-outline-variant overflow-hidden"
         style="height: calc(100vh - 20rem);"
+        @dragover.prevent
+        @drop="handleTextDrop($event, 'old')"
+        title="拖拽文本文件到此处导入为旧文本"
       >
         <MonacoEditor
           ref="monacoRef"
@@ -230,9 +253,13 @@ function clearImg(target: 'a' | 'b') {
               </button>
             </div>
           </div>
-          <div class="flex h-48 items-center justify-center rounded-xl bg-surface-variant/30">
+          <div
+            class="flex h-48 items-center justify-center rounded-xl bg-surface-variant/30 transition-colors hover:bg-primary-container/20"
+            @dragover.prevent
+            @drop="handleImgDrop($event, 'a')"
+          >
             <img v-if="imgA" :src="imgA" class="max-h-full max-w-full rounded-lg object-contain" />
-            <span v-else class="text-xs text-on-surface-variant">请上传图片</span>
+            <span v-else class="text-xs text-on-surface-variant">请上传或拖拽图片</span>
           </div>
         </div>
         <div class="rounded-2xl bg-surface p-4 shadow-sm outline outline-1 outline-outline-variant">
@@ -249,9 +276,13 @@ function clearImg(target: 'a' | 'b') {
               </button>
             </div>
           </div>
-          <div class="flex h-48 items-center justify-center rounded-xl bg-surface-variant/30">
+          <div
+            class="flex h-48 items-center justify-center rounded-xl bg-surface-variant/30 transition-colors hover:bg-primary-container/20"
+            @dragover.prevent
+            @drop="handleImgDrop($event, 'b')"
+          >
             <img v-if="imgB" :src="imgB" class="max-h-full max-w-full rounded-lg object-contain" />
-            <span v-else class="text-xs text-on-surface-variant">请上传图片</span>
+            <span v-else class="text-xs text-on-surface-variant">请上传或拖拽图片</span>
           </div>
         </div>
       </div>

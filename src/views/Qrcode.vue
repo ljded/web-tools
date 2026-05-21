@@ -117,6 +117,10 @@ function decodeFromImageData(imageData: ImageData) {
 
 function handleParseFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) parseImageFile(file)
+}
+
+function parseImageFile(file: File) {
   if (!file) return
   const reader = new FileReader()
   reader.onload = () => {
@@ -135,6 +139,12 @@ function handleParseFile(e: Event) {
     img.src = reader.result as string
   }
   reader.readAsDataURL(file)
+}
+
+function handleParseDrop(e: DragEvent) {
+  e.preventDefault()
+  const file = e.dataTransfer?.files?.[0]
+  if (file) parseImageFile(file)
 }
 
 function parseFromInput() {
@@ -276,7 +286,11 @@ async function copyParseResult() {
     <!-- 解析 -->
     <div v-else class="space-y-6">
       <div class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
+        <div
+          class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-dashed border-outline p-4 transition-colors hover:border-primary hover:bg-primary-container/20"
+          @dragover.prevent
+          @drop="handleParseDrop"
+        >
           <div class="flex items-center gap-3">
             <button
               @click="triggerParseFile"
@@ -286,7 +300,7 @@ async function copyParseResult() {
               上传图片
             </button>
             <input ref="parseFileInput" type="file" accept="image/*" class="hidden" @change="handleParseFile" />
-            <span class="text-xs text-on-surface-variant">或粘贴 Base64 / Data URL</span>
+            <span class="text-xs text-on-surface-variant">或拖拽图片 / 粘贴 Base64 / Data URL</span>
           </div>
           <HistoryPanel
             :items="parseHistory.items.value"
