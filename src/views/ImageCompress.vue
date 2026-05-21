@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { Upload, Download, Image } from '@lucide/vue'
 import { usePersistedRef } from '@/utils/persist'
+import { compressImageFile } from '@/utils/imageCompression'
 
 const originalFile = ref<File | null>(null)
 const compressedFile = ref<File | null>(null)
@@ -56,13 +57,11 @@ async function compress() {
   loading.value = true
   error.value = ''
   try {
-    const { default: imageCompression } = await import('browser-image-compression')
     const options = {
       maxWidthOrHeight: Math.min(Math.max(maxWidth.value, maxHeight.value), 4096),
-      useWebWorker: true,
       initialQuality: Math.min(Math.max(quality.value, 0.1), 1),
     }
-    const file = await imageCompression(originalFile.value, options)
+    const file = await compressImageFile(originalFile.value, options)
     compressedFile.value = file
   } catch (e: any) {
     error.value = '压缩失败: ' + (e.message || e)

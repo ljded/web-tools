@@ -13,6 +13,7 @@ import {
   FileImage,
 } from '@lucide/vue'
 import { usePersistedRef } from '@/utils/persist'
+import { compressImageFile } from '@/utils/imageCompression'
 
 interface FileItem {
   file: File
@@ -96,7 +97,6 @@ async function processAll() {
   if (!files.value.length) return
 
   if (batchOp.value === 'compress') {
-    const { default: imageCompression } = await import('browser-image-compression')
     for (let i = 0; i < files.value.length; i++) {
       const item = files.value[i]!
       if (item.resultFile || item.loading) continue
@@ -105,10 +105,9 @@ async function processAll() {
       try {
         const options = {
           maxWidthOrHeight: Math.min(Math.max(maxWidth.value, maxHeight.value), 4096),
-          useWebWorker: true,
           initialQuality: Math.min(Math.max(quality.value, 0.1), 1),
         }
-        const file = await imageCompression(item.file, options)
+        const file = await compressImageFile(item.file, options)
         item.resultFile = file
         item.resultUrl = URL.createObjectURL(file)
         item.resultName = item.file.name.replace(/\.[^.]+$/, '') + '_compressed.jpg'
