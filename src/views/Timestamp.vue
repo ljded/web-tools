@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import dayjs from 'dayjs'
 import { Copy, Check } from '@lucide/vue'
 import { copyToClipboard } from '@/utils/clipboard'
+import { usePersistedRef } from '@/utils/persist'
 
 const nowTs = ref(Math.floor(Date.now() / 1000))
 const nowMs = ref(Date.now())
@@ -19,15 +20,15 @@ onMounted(() => {
 onUnmounted(() => clearInterval(timer))
 
 // 日期转时间戳
-const dateInput = ref(dayjs().format('YYYY-MM-DD HH:mm:ss'))
+const dateInput = usePersistedRef('web-tools:ts:dateInput', dayjs().format('YYYY-MM-DD HH:mm:ss'))
 const dateTs = computed(() => {
   const d = dayjs(dateInput.value)
   return d.isValid() ? { s: d.valueOf() / 1000, ms: d.valueOf() } : null
 })
 
 // 时间戳转日期
-const tsInput = ref(Math.floor(Date.now() / 1000).toString())
-const tsUnit = ref<'s' | 'ms'>('s')
+const tsInput = usePersistedRef('web-tools:ts:tsInput', Math.floor(Date.now() / 1000).toString())
+const tsUnit = usePersistedRef<'s' | 'ms'>('web-tools:ts:tsUnit', 's')
 const tsDate = computed(() => {
   const n = Number(tsInput.value)
   if (!n || isNaN(n)) return null
@@ -37,9 +38,9 @@ const tsDate = computed(() => {
 })
 
 // 时区计算
-const tzDate = ref(dayjs().format('YYYY-MM-DD HH:mm:ss'))
-const tzFrom = ref(dayjs().format('Z'))
-const tzTo = ref('+00:00')
+const tzDate = usePersistedRef('web-tools:ts:tzDate', dayjs().format('YYYY-MM-DD HH:mm:ss'))
+const tzFrom = usePersistedRef('web-tools:ts:tzFrom', dayjs().format('Z'))
+const tzTo = usePersistedRef('web-tools:ts:tzTo', '+00:00')
 const tzResult = computed(() => {
   const d = dayjs(tzDate.value)
   if (!d.isValid()) return null
@@ -67,8 +68,8 @@ const timezones = [
 ]
 
 // 日期差值
-const diffDate1 = ref(dayjs().format('YYYY-MM-DD'))
-const diffDate2 = ref(dayjs().add(7, 'day').format('YYYY-MM-DD'))
+const diffDate1 = usePersistedRef('web-tools:ts:diffDate1', dayjs().format('YYYY-MM-DD'))
+const diffDate2 = usePersistedRef('web-tools:ts:diffDate2', dayjs().add(7, 'day').format('YYYY-MM-DD'))
 const diffResult = computed(() => {
   const d1 = dayjs(diffDate1.value)
   const d2 = dayjs(diffDate2.value)
@@ -98,7 +99,10 @@ async function copy(val: string) {
           <div class="text-xs text-on-surface-variant">秒 (s)</div>
           <div class="mt-1 flex items-center justify-between">
             <span class="font-mono text-xl text-on-surface">{{ nowTs }}</span>
-            <button @click="copy(String(nowTs))" class="rounded-full p-1.5 hover:bg-surface-variant">
+            <button
+              @click="copy(String(nowTs))"
+              class="rounded-full p-1.5 hover:bg-surface-variant"
+            >
               <Copy class="h-4 w-4 text-on-surface-variant" />
             </button>
           </div>
@@ -107,7 +111,10 @@ async function copy(val: string) {
           <div class="text-xs text-on-surface-variant">毫秒 (ms)</div>
           <div class="mt-1 flex items-center justify-between">
             <span class="font-mono text-xl text-on-surface">{{ nowMs }}</span>
-            <button @click="copy(String(nowMs))" class="rounded-full p-1.5 hover:bg-surface-variant">
+            <button
+              @click="copy(String(nowMs))"
+              class="rounded-full p-1.5 hover:bg-surface-variant"
+            >
               <Copy class="h-4 w-4 text-on-surface-variant" />
             </button>
           </div>
@@ -174,14 +181,18 @@ async function copy(val: string) {
           v-model="tzFrom"
           class="h-10 rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
         >
-          <option v-for="tz in timezones" :key="tz.value" :value="tz.value">{{ tz.label }} ({{ tz.value }})</option>
+          <option v-for="tz in timezones" :key="tz.value" :value="tz.value">
+            {{ tz.label }} ({{ tz.value }})
+          </option>
         </select>
         <span class="text-on-surface-variant">→</span>
         <select
           v-model="tzTo"
           class="h-10 rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
         >
-          <option v-for="tz in timezones" :key="tz.value" :value="tz.value">{{ tz.label }} ({{ tz.value }})</option>
+          <option v-for="tz in timezones" :key="tz.value" :value="tz.value">
+            {{ tz.label }} ({{ tz.value }})
+          </option>
         </select>
       </div>
       <div v-if="tzResult" class="mt-4 rounded-xl bg-surface-variant/50 p-3">

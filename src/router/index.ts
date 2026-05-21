@@ -1,8 +1,8 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 import Home from '@/views/Home.vue'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
+  history: createWebHashHistory(import.meta.env.BASE_URL),
   scrollBehavior() {
     return { top: 0 }
   },
@@ -17,7 +17,10 @@ const router = createRouter({
     { path: '/random', name: 'random', component: () => import('@/views/RandomData.vue') },
     { path: '/crypto', name: 'crypto', component: () => import('@/views/Crypto.vue') },
     { path: '/regex', name: 'regex', component: () => import('@/views/Regex.vue') },
-    { path: '/image', name: 'image', component: () => import('@/views/ImageCompress.vue') },
+    { path: '/image', name: 'image', component: () => import('@/views/ImageTool.vue') },
+    { path: '/pdf', name: 'pdf', component: () => import('@/views/PdfTool.vue') },
+    { path: '/color', name: 'color', component: () => import('@/views/ColorTool.vue') },
+    { path: '/diff', name: 'diff', component: () => import('@/views/DiffTool.vue') },
   ],
 })
 

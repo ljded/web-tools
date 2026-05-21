@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   --color-primary: #6750a4;
@@ -33,7 +33,11 @@
   body {
     background-color: var(--color-background);
     color: var(--color-on-background);
-    font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+    font-family:
+      'Roboto',
+      system-ui,
+      -apple-system,
+      sans-serif;
   }
 
   .dark {

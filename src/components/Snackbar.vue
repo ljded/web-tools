@@ -8,12 +8,15 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'update:show', v: boolean): void }>()
 
 let timer: ReturnType<typeof setTimeout>
-watch(() => props.show, (val) => {
-  clearTimeout(timer)
-  if (val) {
-    timer = setTimeout(() => emit('update:show', false), 2500)
-  }
-})
+watch(
+  () => props.show,
+  (val) => {
+    clearTimeout(timer)
+    if (val) {
+      timer = setTimeout(() => emit('update:show', false), 2500)
+    }
+  },
+)
 </script>
 
 <template>

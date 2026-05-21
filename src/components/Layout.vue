@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Home,
@@ -13,36 +13,76 @@ import {
   Lock,
   Regex,
   Image,
+  Palette,
+  FileDiff,
+  FileText,
   Menu,
   ChevronLeft,
+  ChevronDown,
   Sun,
   Moon,
   Monitor,
 } from '@lucide/vue'
 import { useThemeStore } from '@/stores/theme'
+import { useLocaleStore } from '@/stores/locale'
+import { useI18n } from 'vue-i18n'
 
 const route = useRoute()
 const router = useRouter()
 const drawerOpen = ref(false)
 const theme = useThemeStore()
+const locale = useLocaleStore()
+const { t } = useI18n()
 
-const navItems = [
-  { path: '/', label: '首页', icon: Home },
-  { path: '/hash', label: '哈希计算', icon: Hash },
-  { path: '/json', label: 'JSON 编辑器', icon: Braces },
-  { path: '/base64', label: 'Base64', icon: Code },
-  { path: '/timestamp', label: '时间戳', icon: Clock },
-  { path: '/qrcode', label: '二维码', icon: QrCode },
-  { path: '/encoding', label: '字符编码', icon: Type },
-  { path: '/random', label: '随机数据', icon: Shuffle },
-  { path: '/crypto', label: '加解密', icon: Lock },
-  { path: '/regex', label: '正则表达式', icon: Regex },
-  { path: '/image', label: '图片压缩', icon: Image },
-]
+const homeItem = computed(() => ({ path: '/', label: t('nav.home'), icon: Home }))
+
+const groups = computed(() => [
+  {
+    label: t('nav.groups.common'),
+    items: [
+      { path: '/hash', label: t('tools.hash.title'), icon: Hash },
+      { path: '/timestamp', label: t('tools.timestamp.title'), icon: Clock },
+      { path: '/qrcode', label: t('tools.qrcode.title'), icon: QrCode },
+      { path: '/random', label: t('tools.random.title'), icon: Shuffle },
+      { path: '/color', label: t('tools.color.title'), icon: Palette },
+    ],
+  },
+  {
+    label: t('nav.groups.text'),
+    items: [
+      { path: '/base64', label: 'Base64', icon: Code },
+      { path: '/encoding', label: t('tools.encoding.title'), icon: Type },
+      { path: '/json', label: t('tools.json.title'), icon: Braces },
+      { path: '/regex', label: t('tools.regex.title'), icon: Regex },
+      { path: '/diff', label: t('tools.diff.title'), icon: FileDiff },
+    ],
+  },
+  {
+    label: t('nav.groups.security'),
+    items: [
+      { path: '/crypto', label: t('tools.crypto.title'), icon: Lock },
+      { path: '/image', label: t('tools.image.title'), icon: Image },
+      { path: '/pdf', label: t('tools.pdf.title'), icon: FileText },
+    ],
+  },
+])
+
+const expanded = ref<Record<string, boolean>>({})
+
+function initExpanded() {
+  groups.value.forEach((g) => {
+    expanded.value[g.label] = g.items.some((i) => i.path === route.path)
+  })
+}
+
+initExpanded()
+watch(() => route.path, initExpanded)
+
+const allNavItems = computed(() => [homeItem.value, ...groups.value.flatMap((g) => g.items)])
 
 const currentTitle = computed(() => {
-  const item = navItems.find((i) => i.path === route.path)
-  return item?.label ?? '工具箱'
+  const item = allNavItems.value.find((i) => i.path === route.path)
+  return item?.label ?? t('app.title')
 })
 
 function goTo(path: string) {
@@ -55,36 +95,65 @@ function goTo(path: string) {
   <div class="flex h-screen bg-surface">
     <!-- 侧边导航栏 -->
     <aside
-      class="fixed inset-y-0 left-0 z-50 w-72 transform bg-surface shadow-2xl transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:shadow-none md:bg-surface-variant/30"
+      class="fixed inset-y-0 left-0 z-50 flex w-64 transform flex-col bg-surface shadow-2xl transition-transform duration-300 ease-in-out md:relative md:translate-x-0 md:shadow-none md:bg-surface-variant/30"
       :class="drawerOpen ? 'translate-x-0' : '-translate-x-full'"
     >
-      <div class="flex h-16 items-center px-4 md:hidden">
+      <div class="flex h-14 items-center px-4 md:hidden">
         <button
           @click="drawerOpen = false"
           class="flex h-10 w-10 items-center justify-center rounded-full hover:bg-surface-variant transition-colors"
         >
           <ChevronLeft class="h-6 w-6 text-on-surface" />
         </button>
-        <span class="ml-2 text-xl font-medium text-on-surface">工具箱</span>
+        <span class="ml-2 text-xl font-medium text-on-surface">Web Tools</span>
       </div>
-      <div class="hidden h-16 items-center px-6 md:flex">
-        <span class="text-2xl font-medium text-primary">WebTools</span>
+      <div class="hidden h-14 items-center px-5 md:flex">
+        <div>
+          <div class="text-xl font-semibold tracking-tight text-primary">{{ t('app.title') }}</div>
+          <div class="text-xs font-medium text-on-surface-variant">{{ t('app.subtitle') }}</div>
+        </div>
       </div>
-      <nav class="mt-2 space-y-1 px-3">
+      <nav class="flex-1 space-y-1 overflow-y-auto px-2 py-2 md:px-2">
         <button
-          v-for="item in navItems"
-          :key="item.path"
-          @click="goTo(item.path)"
-          class="flex w-full items-center gap-4 rounded-full px-4 py-3 text-sm font-medium transition-colors"
+          @click="goTo(homeItem.path)"
+          class="flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-colors"
           :class="
-            route.path === item.path
+            route.path === homeItem.path
               ? 'bg-secondary-container text-on-secondary-container'
               : 'text-on-surface-variant hover:bg-surface-variant'
           "
         >
-          <component :is="item.icon" class="h-5 w-5" />
-          {{ item.label }}
+          <component :is="homeItem.icon" class="h-4.5 w-4.5" />
+          {{ homeItem.label }}
         </button>
+        <div v-for="group in groups" :key="group.label" class="mb-1">
+          <button
+            @click="expanded[group.label] = !expanded[group.label]"
+            class="flex w-full items-center justify-between rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wider text-on-surface-variant transition-colors hover:bg-surface-variant/50"
+          >
+            {{ group.label }}
+            <ChevronDown
+              class="h-4 w-4 transition-transform"
+              :class="expanded[group.label] ? 'rotate-180' : ''"
+            />
+          </button>
+          <div v-show="expanded[group.label]" class="mt-0.5 space-y-0.5">
+            <button
+              v-for="item in group.items"
+              :key="item.path"
+              @click="goTo(item.path)"
+              class="flex w-full items-center gap-3 rounded-full px-3 py-2 text-sm font-medium transition-colors"
+              :class="
+                route.path === item.path
+                  ? 'bg-secondary-container text-on-secondary-container'
+                  : 'text-on-surface-variant hover:bg-surface-variant'
+              "
+            >
+              <component :is="item.icon" class="h-4.5 w-4.5" />
+              {{ item.label }}
+            </button>
+          </div>
+        </div>
       </nav>
     </aside>
 
@@ -98,9 +167,7 @@ function goTo(path: string) {
     <!-- 主内容区 -->
     <div class="flex flex-1 flex-col overflow-hidden">
       <!-- 顶部 AppBar -->
-      <header
-        class="flex h-16 items-center gap-4 bg-surface px-4 shadow-sm"
-      >
+      <header class="flex h-16 items-center gap-4 bg-surface px-4 shadow-sm">
         <button
           @click="drawerOpen = true"
           class="flex h-10 w-10 items-center justify-center rounded-full hover:bg-surface-variant transition-colors md:hidden"
@@ -112,33 +179,57 @@ function goTo(path: string) {
           <button
             @click="theme.mode = 'light'"
             class="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
-            :class="theme.mode === 'light' ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant hover:bg-surface-variant'"
-            title="浅色"
+            :class="
+              theme.mode === 'light'
+                ? 'bg-secondary-container text-on-secondary-container'
+                : 'text-on-surface-variant hover:bg-surface-variant'
+            "
+            :title="t('theme.light')"
           >
             <Sun class="h-4 w-4" />
           </button>
           <button
             @click="theme.mode = 'dark'"
             class="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
-            :class="theme.mode === 'dark' ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant hover:bg-surface-variant'"
-            title="深色"
+            :class="
+              theme.mode === 'dark'
+                ? 'bg-secondary-container text-on-secondary-container'
+                : 'text-on-surface-variant hover:bg-surface-variant'
+            "
+            :title="t('theme.dark')"
           >
             <Moon class="h-4 w-4" />
           </button>
           <button
             @click="theme.mode = 'auto'"
             class="flex h-9 w-9 items-center justify-center rounded-full transition-colors"
-            :class="theme.mode === 'auto' ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant hover:bg-surface-variant'"
-            title="跟随系统"
+            :class="
+              theme.mode === 'auto'
+                ? 'bg-secondary-container text-on-secondary-container'
+                : 'text-on-surface-variant hover:bg-surface-variant'
+            "
+            :title="t('theme.auto')"
           >
             <Monitor class="h-4 w-4" />
+          </button>
+          <button
+            @click="locale.setLocale(locale.locale === 'zh-CN' ? 'en-US' : 'zh-CN')"
+            class="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition-colors"
+            :class="
+              'text-on-surface-variant hover:bg-surface-variant'
+            "
+            :title="t('locale.en')"
+          >
+            {{ locale.locale === 'zh-CN' ? 'EN' : '中' }}
           </button>
         </div>
       </header>
 
       <!-- 本地运行提示 -->
-      <div class="bg-primary-container px-4 py-2 text-center text-xs font-medium text-on-primary-container">
-        🔒 所有操作均在浏览器本地完成，数据不会上传到任何服务器
+      <div
+        class="bg-primary-container px-4 py-1.5 text-center text-[11px] font-medium text-on-primary-container"
+      >
+        {{ t('app.localNotice') }}
       </div>
       <!-- 内容 -->
       <main class="flex-1 overflow-y-auto p-4 md:p-6">

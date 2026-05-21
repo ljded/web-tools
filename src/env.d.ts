@@ -10,8 +10,8 @@ declare module 'sm-crypto' {
     function doVerifySignature(msg: string, sig: string, publicKey: string): boolean
   }
   export namespace sm4 {
-    function encrypt(plainText: string, key: string): string
-    function decrypt(cipherText: string, key: string): string
+    function encrypt(plainText: string, key: string, options?: { mode?: string; padding?: string }): string
+    function decrypt(cipherText: string, key: string, options?: { mode?: string; padding?: string }): string
   }
 }
 

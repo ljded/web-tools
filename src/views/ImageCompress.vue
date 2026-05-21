@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import imageCompression from 'browser-image-compression'
 import { Upload, Download, Image } from '@lucide/vue'
+import { usePersistedRef } from '@/utils/persist'
 
 const originalFile = ref<File | null>(null)
 const compressedFile = ref<File | null>(null)
-const quality = ref(0.8)
-const maxWidth = ref(1920)
-const maxHeight = ref(1080)
+const quality = usePersistedRef('web-tools:imgcompress:quality', 0.8)
+const maxWidth = usePersistedRef('web-tools:imgcompress:max-width', 1920)
+const maxHeight = usePersistedRef('web-tools:imgcompress:max-height', 1080)
 const loading = ref(false)
+const error = ref('')
+
+const MAX_IMAGE_BYTES = 30 * 1024 * 1024
 
 const originalSize = computed(() => {
   if (!originalFile.value) return '-'
@@ -33,6 +36,11 @@ function formatSize(bytes: number): string {
 function handleFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
+  error.value = ''
+  if (file.size > MAX_IMAGE_BYTES) {
+    error.value = `图片超过 ${formatSize(MAX_IMAGE_BYTES)}，为避免浏览器卡顿已拒绝处理。`
+    return
+  }
   originalFile.value = file
   compressedFile.value = null
 }
@@ -46,16 +54,18 @@ function triggerUpload() {
 async function compress() {
   if (!originalFile.value) return
   loading.value = true
+  error.value = ''
   try {
+    const { default: imageCompression } = await import('browser-image-compression')
     const options = {
-      maxWidthOrHeight: Math.max(maxWidth.value, maxHeight.value),
+      maxWidthOrHeight: Math.min(Math.max(maxWidth.value, maxHeight.value), 4096),
       useWebWorker: true,
-      initialQuality: quality.value,
+      initialQuality: Math.min(Math.max(quality.value, 0.1), 1),
     }
     const file = await imageCompression(originalFile.value, options)
     compressedFile.value = file
   } catch (e: any) {
-    alert('压缩失败: ' + (e.message || e))
+    error.value = '压缩失败: ' + (e.message || e)
   } finally {
     loading.value = false
   }
@@ -74,7 +84,9 @@ function download() {
 
 <template>
   <div class="mx-auto max-w-4xl space-y-6">
-    <div class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant space-y-4">
+    <div
+      class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant space-y-4"
+    >
       <div class="flex items-center justify-center">
         <button
           @click="triggerUpload"
@@ -86,6 +98,7 @@ function download() {
         </button>
         <input id="img-upload" type="file" accept="image/*" class="hidden" @change="handleFile" />
       </div>
+      <div v-if="error" class="text-sm text-error">{{ error }}</div>
 
       <div v-if="originalFile" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div class="rounded-xl bg-surface-variant/50 p-3">
@@ -101,16 +114,33 @@ function download() {
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <label class="mb-1 block text-sm text-on-surface-variant">最大宽度</label>
-          <input v-model.number="maxWidth" type="number" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+          <input
+            v-model.number="maxWidth"
+            type="number"
+            class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
         </div>
         <div>
           <label class="mb-1 block text-sm text-on-surface-variant">最大高度</label>
-          <input v-model.number="maxHeight" type="number" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+          <input
+            v-model.number="maxHeight"
+            type="number"
+            class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+          />
         </div>
         <div>
           <label class="mb-1 block text-sm text-on-surface-variant">质量</label>
-          <input v-model.number="quality" type="range" min="0.1" max="1" step="0.05" class="h-10 w-full" />
-          <div class="text-right text-xs text-on-surface-variant">{{ (quality * 100).toFixed(0) }}%</div>
+          <input
+            v-model.number="quality"
+            type="range"
+            min="0.1"
+            max="1"
+            step="0.05"
+            class="h-10 w-full"
+          />
+          <div class="text-right text-xs text-on-surface-variant">
+            {{ (quality * 100).toFixed(0) }}%
+          </div>
         </div>
       </div>
 
