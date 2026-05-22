@@ -2,14 +2,14 @@
 import { RouterView } from 'vue-router'
 import Layout from './components/Layout.vue'
 import Snackbar from './components/Snackbar.vue'
-import { useSnackbarStore } from './stores/snackbar'
-
-const snackbar = useSnackbarStore()
+import ErrorBoundary from './components/ErrorBoundary.vue'
 </script>
 
 <template>
   <Layout>
-    <RouterView />
+    <ErrorBoundary>
+      <RouterView />
+    </ErrorBoundary>
   </Layout>
-  <Snackbar v-model:show="snackbar.show" :message="snackbar.message" />
+  <Snackbar />
 </template>

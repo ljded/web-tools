@@ -44,15 +44,17 @@ function onSelect(item: HistoryItem) {
 
 <template>
   <div class="relative">
-    <button
+    <UButton
+      variant="ghost"
+      color="neutral"
       @click="open = !open"
       class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-variant transition-colors"
       :class="open ? 'bg-surface-variant' : ''"
     >
       <History class="h-3.5 w-3.5" />
       {{ t('app.history') }}
-      <span v-if="items.length" class="rounded-full bg-primary-container px-1.5 py-0 text-[10px] text-on-primary-container">{{ items.length }}</span>
-    </button>
+      <UBadge v-if="items.length" color="primary" variant="soft" size="xs" class="text-[10px]">{{ items.length }}</UBadge>
+    </UButton>
 
     <div
       v-if="open"
@@ -61,20 +63,26 @@ function onSelect(item: HistoryItem) {
       <div class="flex items-center justify-between border-b border-outline-variant px-3 py-2">
         <span class="text-xs font-medium text-on-surface-variant">{{ displayTitle }}</span>
         <div class="flex items-center gap-1">
-          <button
+          <UButton
             v-if="items.length"
+            variant="ghost"
+            color="error"
+            size="xs"
             @click="emit('clear')"
             class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-error hover:bg-error-container/30 transition-colors"
           >
             <Trash2 class="h-3 w-3" />
             {{ t('app.clear') }}
-          </button>
-          <button
+          </UButton>
+          <UButton
+            variant="ghost"
+            color="neutral"
+            size="xs"
             @click="open = false"
             class="rounded p-0.5 text-on-surface-variant hover:bg-surface-variant transition-colors"
           >
             <X class="h-3.5 w-3.5" />
-          </button>
+          </UButton>
         </div>
       </div>
 
@@ -96,12 +104,15 @@ function onSelect(item: HistoryItem) {
               {{ formatTime(item.timestamp) }}
             </div>
           </div>
-          <button
+          <UButton
+            variant="ghost"
+            color="neutral"
+            size="xs"
             @click.stop="emit('remove', item.id)"
             class="shrink-0 rounded p-1 text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-colors"
           >
             <X class="h-3 w-3" />
-          </button>
+          </UButton>
         </button>
       </div>
     </div>

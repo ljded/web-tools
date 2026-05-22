@@ -40,6 +40,7 @@ export default {
     justNow: '刚刚',
     minutesAgo: '{n}分钟前',
     hoursAgo: '{n}小时前',
+    close: '关闭',
     waitingForInput: '等待输入...',
     computing: '计算中...',
   },
@@ -49,6 +50,7 @@ export default {
       common: '常用工具',
       text: '文本处理',
       security: '文件安全',
+      media: '媒体处理',
     },
   },
   theme: {

@@ -1,22 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Copy, Check, RefreshCw } from '@lucide/vue'
-import { copyToClipboard } from '@/utils/clipboard'
+import { RefreshCw, Dices } from '@lucide/vue'
+import { useClipboard } from '@/composables'
+import ToolLayout from '@/components/ToolLayout.vue'
+import ToolHeader from '@/components/ToolHeader.vue'
+import CopyBtn from '@/components/CopyBtn.vue'
 
-const copiedMap = ref<Record<string, boolean>>({})
-
-async function copy(val: string, key: string) {
-  const ok = await copyToClipboard(val)
-  if (!ok) return
-  copiedMap.value[key] = true
-  setTimeout(() => delete copiedMap.value[key], 1500)
-}
+const { copy } = useClipboard()
 
 function randomInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-// 手机号
 function genPhone(): string {
   const prefixes = [
     '138', '139', '135', '136', '137', '150', '151', '152', '157', '158', '159',
@@ -28,7 +23,6 @@ function genPhone(): string {
   return prefix + suffix
 }
 
-// 身份证号
 function genIdCard(): string {
   const areaCodes = [
     '110101', '110105', '310101', '310115', '440106', '440305',
@@ -51,7 +45,6 @@ function genIdCard(): string {
   return body + checkCodes[sum % 11]
 }
 
-// 邮箱
 function genEmail(): string {
   const names = ['zhang', 'li', 'wang', 'zhao', 'chen', 'liu', 'yang', 'huang', 'zhou', 'wu', 'sun', 'ma', 'zhu']
   const domains = ['qq.com', '163.com', '126.com', 'gmail.com', 'outlook.com', 'sina.com', 'foxmail.com', 'yeah.net']
@@ -60,7 +53,6 @@ function genEmail(): string {
   return `${name}@${domain}`
 }
 
-// 银行卡号 (Luhn)
 function genBankCard(): string {
   const prefix = '6222'
   let num = prefix
@@ -80,7 +72,6 @@ function genBankCard(): string {
   return num + check
 }
 
-// UUID
 function genUUID(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0
@@ -89,17 +80,14 @@ function genUUID(): string {
   })
 }
 
-// IPv4
 function genIP(): string {
   return `${randomInt(1, 223)}.${randomInt(0, 255)}.${randomInt(0, 255)}.${randomInt(0, 255)}`
 }
 
-// MAC
 function genMAC(): string {
   return Array.from({ length: 6 }, () => randomInt(0, 255).toString(16).padStart(2, '0')).join(':')
 }
 
-// 密码
 function genPassword(len = 16): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*'
   let s = ''
@@ -107,28 +95,24 @@ function genPassword(len = 16): string {
   return s
 }
 
-// 姓名
 async function genName(): Promise<string> {
   const mod = await import('@faker-js/faker')
   const f = (mod as any).fakerZH_CN || mod.faker
   return f.person.fullName()
 }
 
-// 地址
 async function genAddress(): Promise<string> {
   const mod = await import('@faker-js/faker')
   const f = (mod as any).fakerZH_CN || mod.faker
   return f.location.city() + f.location.streetAddress()
 }
 
-// 公司名
 async function genCompany(): Promise<string> {
   const mod = await import('@faker-js/faker')
   const f = (mod as any).fakerZH_CN || mod.faker
   return f.company.name()
 }
 
-// 随机字符串
 function genRandomString(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
   let s = ''
@@ -176,39 +160,43 @@ async function generate(key: string) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl space-y-6">
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <div
-        v-for="g in generators"
-        :key="g.key"
-        class="rounded-2xl bg-surface p-4 shadow-sm outline outline-1 outline-outline-variant"
-      >
-        <div class="mb-3 flex items-center justify-between">
-          <span class="text-sm font-medium text-on-surface">{{ g.label }}</span>
-          <button
-            @click="generate(g.key)"
-            class="rounded-full p-1.5 text-on-surface-variant hover:bg-surface-variant transition-colors"
-            :disabled="loading[g.key]"
-          >
-            <RefreshCw class="h-3.5 w-3.5" :class="loading[g.key] ? 'animate-spin' : ''" />
-          </button>
-        </div>
-        <div class="flex items-center gap-2">
-          <div
-            class="flex-1 truncate rounded-xl bg-surface-variant/50 px-3 py-2 font-mono text-sm text-on-surface"
-          >
-            {{ results[g.key] || '-' }}
+  <ToolLayout max-width="5xl">
+    <ToolHeader
+      title="随机数据生成"
+      description="一键生成手机号、身份证、UUID、密码等常用测试数据"
+      :icon="Dices"
+    />
+
+    <UCard class="overflow-hidden rounded-3xl bg-surface shadow-sm outline outline-1 outline-outline-variant">
+      <div class="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3">
+        <UCard
+          v-for="g in generators"
+          :key="g.key"
+          class="overflow-hidden rounded-2xl bg-surface-variant/30 p-4 shadow-sm outline outline-1 outline-outline-variant"
+        >
+          <div class="mb-3 flex items-center justify-between">
+            <span class="text-sm font-medium text-on-surface">{{ g.label }}</span>
+            <button
+              @click="generate(g.key)"
+              class="rounded-full p-1.5 text-on-surface-variant hover:bg-surface-variant transition-colors"
+              :disabled="loading[g.key]"
+            >
+              <RefreshCw class="h-3.5 w-3.5" :class="loading[g.key] ? 'animate-spin' : ''" />
+            </button>
           </div>
-          <button
-            v-if="results[g.key] && results[g.key] !== '生成失败'"
-            @click="copy(results[g.key]!, g.key)"
-            class="rounded-full p-1.5 hover:bg-surface-variant transition-colors"
-          >
-            <Check v-if="copiedMap[g.key]" class="h-4 w-4 text-primary" />
-            <Copy v-else class="h-4 w-4 text-on-surface-variant" />
-          </button>
-        </div>
+          <div class="flex items-center gap-2">
+            <div
+              class="flex-1 truncate rounded-xl bg-surface-variant/50 px-3 py-2 font-mono text-sm text-on-surface"
+            >
+              {{ results[g.key] || '-' }}
+            </div>
+            <CopyBtn
+              v-if="results[g.key] && results[g.key] !== '生成失败'"
+              :text="results[g.key]!"
+            />
+          </div>
+        </UCard>
       </div>
-    </div>
-  </div>
+    </UCard>
+  </ToolLayout>
 </template>

@@ -41,6 +41,7 @@ export default {
     justNow: 'Just now',
     minutesAgo: '{n} min ago',
     hoursAgo: '{n} hr ago',
+    close: 'Close',
     waitingForInput: 'Waiting for input...',
     computing: 'Computing...',
   },
@@ -50,6 +51,7 @@ export default {
       common: 'Common',
       text: 'Text',
       security: 'Security',
+      media: 'Media',
     },
   },
   theme: {

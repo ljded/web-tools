@@ -8,12 +8,14 @@ import {
   RotateCw,
   Scissors,
   Type,
-  Palette,
   Maximize,
   FileImage,
 } from '@lucide/vue'
 import { usePersistedRef } from '@/utils/persist'
 import { compressImageFile } from '@/utils/imageCompression'
+import ToolLayout from '@/components/ToolLayout.vue'
+import ToolHeader from '@/components/ToolHeader.vue'
+import ToolCard from '@/components/ToolCard.vue'
 
 interface FileItem {
   file: File
@@ -40,10 +42,7 @@ const maxWidth = usePersistedRef('web-tools:image:max-width', 1920)
 const maxHeight = usePersistedRef('web-tools:image:max-height', 1080)
 
 // format
-const targetFormat = usePersistedRef<'image/png' | 'image/jpeg' | 'image/webp'>(
-  'web-tools:image:target-format',
-  'image/jpeg',
-)
+const targetFormat = usePersistedRef<'image/png' | 'image/jpeg' | 'image/webp'>('web-tools:image:target-format', 'image/jpeg')
 
 // resize
 const resizeWidth = usePersistedRef('web-tools:image:resize-width', 800)
@@ -55,10 +54,7 @@ const wmText = usePersistedRef('web-tools:image:wm-text', 'Watermark')
 const wmSize = usePersistedRef('web-tools:image:wm-size', 24)
 const wmColor = usePersistedRef('web-tools:image:wm-color', '#ffffff')
 const wmOpacity = usePersistedRef('web-tools:image:wm-opacity', 0.5)
-const wmPos = usePersistedRef<'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>(
-  'web-tools:image:wm-pos',
-  'bottom-right',
-)
+const wmPos = usePersistedRef<'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('web-tools:image:wm-pos', 'bottom-right')
 
 // rotate
 const rotateDeg = usePersistedRef<90 | 180 | 270>('web-tools:image:rotate-deg', 90)
@@ -194,30 +190,14 @@ async function processAll() {
           const metrics = ctx.measureText(wmText.value)
           const tw = metrics.width
           const th = wmSize.value
-          let x = 0
-          let y = 0
+          let x = 0, y = 0
           const padding = 16
           switch (wmPos.value) {
-            case 'top-left':
-              x = padding
-              y = padding + th
-              break
-            case 'top-right':
-              x = w - tw - padding
-              y = padding + th
-              break
-            case 'bottom-left':
-              x = padding
-              y = h - padding
-              break
-            case 'bottom-right':
-              x = w - tw - padding
-              y = h - padding
-              break
-            case 'center':
-              x = (w - tw) / 2
-              y = (h + th) / 2
-              break
+            case 'top-left': x = padding; y = padding + th; break
+            case 'top-right': x = w - tw - padding; y = padding + th; break
+            case 'bottom-left': x = padding; y = h - padding; break
+            case 'bottom-right': x = w - tw - padding; y = h - padding; break
+            case 'center': x = (w - tw) / 2; y = (h + th) / 2; break
           }
           ctx.fillText(wmText.value, x, y)
           ctx.restore()
@@ -266,19 +246,17 @@ function formatSize(bytes: number): string {
 
 const batchOpLabel = computed(() => {
   const map: Record<string, string> = {
-    compress: '图片压缩',
-    format: '格式转换',
-    resize: '尺寸修改',
-    watermark: '添加水印',
-    rotate: '旋转',
-    crop: '裁剪',
+    compress: '图片压缩', format: '格式转换', resize: '尺寸修改',
+    watermark: '添加水印', rotate: '旋转', crop: '裁剪',
   }
   return map[batchOp.value] || batchOp.value
 })
 </script>
 
 <template>
-  <div class="mx-auto max-w-5xl space-y-6">
+  <ToolLayout max-width="5xl">
+    <ToolHeader title="图片处理" description="批量压缩、格式转换、尺寸修改、水印、旋转、裁剪" :icon="ImageIcon" />
+
     <!-- 操作选择 -->
     <div class="flex flex-wrap gap-2">
       <button
@@ -293,18 +271,14 @@ const batchOpLabel = computed(() => {
         :key="op.key"
         @click="batchOp = op.key"
         class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
-        :class="
-          batchOp === op.key
-            ? 'bg-secondary-container text-on-secondary-container'
-            : 'bg-surface-variant text-on-surface-variant hover:bg-surface-variant/80'
-        "
+        :class="batchOp === op.key ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-variant text-on-surface-variant hover:bg-surface-variant/80'"
       >
         <component :is="op.icon" class="h-3.5 w-3.5" />
         {{ op.label }}
       </button>
     </div>
 
-    <div class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant flex flex-col gap-4">
+    <ToolCard>
       <!-- 上传 -->
       <div class="flex items-center justify-center">
         <button
@@ -328,19 +302,11 @@ const batchOpLabel = computed(() => {
         <div v-if="batchOp === 'compress'" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label class="mb-1 block text-sm text-on-surface-variant">最大宽度</label>
-            <input
-              v-model.number="maxWidth"
-              type="number"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
+            <input v-model.number="maxWidth" type="number" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
           </div>
           <div>
             <label class="mb-1 block text-sm text-on-surface-variant">最大高度</label>
-            <input
-              v-model.number="maxHeight"
-              type="number"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
+            <input v-model.number="maxHeight" type="number" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
           </div>
           <div>
             <label class="mb-1 block text-sm text-on-surface-variant">质量</label>
@@ -352,10 +318,7 @@ const batchOpLabel = computed(() => {
         <!-- 格式转换 -->
         <div v-if="batchOp === 'format'" class="flex items-center gap-3">
           <label class="text-sm text-on-surface">目标格式</label>
-          <select
-            v-model="targetFormat"
-            class="h-10 rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-          >
+          <select v-model="targetFormat" class="h-10 rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
             <option value="image/jpeg">JPEG</option>
             <option value="image/png">PNG</option>
             <option value="image/webp">WebP</option>
@@ -366,21 +329,11 @@ const batchOpLabel = computed(() => {
         <div v-if="batchOp === 'resize'" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <label class="mb-1 block text-xs text-on-surface-variant">目标宽度</label>
-            <input
-              v-model.number="resizeWidth"
-              type="number"
-              min="1"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none"
-            />
+            <input v-model.number="resizeWidth" type="number" min="1" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-on-surface-variant">目标高度</label>
-            <input
-              v-model.number="resizeHeight"
-              type="number"
-              min="1"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none"
-            />
+            <input v-model.number="resizeHeight" type="number" min="1" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none" />
           </div>
           <div class="flex items-end">
             <label class="flex items-center gap-2 text-sm text-on-surface">
@@ -394,17 +347,11 @@ const batchOpLabel = computed(() => {
         <div v-if="batchOp === 'watermark'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label class="mb-1 block text-xs text-on-surface-variant">水印文字</label>
-            <input
-              v-model="wmText"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none"
-            />
+            <input v-model="wmText" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none" />
           </div>
           <div>
             <label class="mb-1 block text-xs text-on-surface-variant">位置</label>
-            <select
-              v-model="wmPos"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none"
-            >
+            <select v-model="wmPos" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none">
               <option value="center">居中</option>
               <option value="top-left">左上</option>
               <option value="top-right">右上</option>
@@ -422,9 +369,7 @@ const batchOpLabel = computed(() => {
             <input v-model.number="wmSize" type="range" min="12" max="120" class="h-6 w-full" />
           </div>
           <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">
-              透明度: {{ (wmOpacity * 100).toFixed(0) }}%
-            </label>
+            <label class="mb-1 block text-xs text-on-surface-variant">透明度: {{ (wmOpacity * 100).toFixed(0) }}%</label>
             <input v-model.number="wmOpacity" type="range" min="0.05" max="1" step="0.05" class="h-6 w-full" />
           </div>
         </div>
@@ -439,41 +384,9 @@ const batchOpLabel = computed(() => {
 
         <!-- 裁剪 -->
         <div v-if="batchOp === 'crop'" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">顶部 (px)</label>
-            <input
-              v-model.number="cropTop"
-              type="number"
-              min="0"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none"
-            />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">底部 (px)</label>
-            <input
-              v-model.number="cropBottom"
-              type="number"
-              min="0"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none"
-            />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">左侧 (px)</label>
-            <input
-              v-model.number="cropLeft"
-              type="number"
-              min="0"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none"
-            />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">右侧 (px)</label>
-            <input
-              v-model.number="cropRight"
-              type="number"
-              min="0"
-              class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none"
-            />
+          <div v-for="dir in ['top', 'bottom', 'left', 'right'] as const" :key="dir">
+            <label class="mb-1 block text-xs text-on-surface-variant">{{ {top:'顶部',bottom:'底部',left:'左侧',right:'右侧'}[dir] }} (px)</label>
+            <input v-model.number="$refs[dir]" type="number" min="0" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none" />
           </div>
         </div>
       </div>
@@ -489,20 +402,14 @@ const batchOpLabel = computed(() => {
 
       <!-- 文件列表 -->
       <div v-if="files.length" class="space-y-3">
-        <div
-          v-for="(item, idx) in files"
-          :key="idx"
-          class="flex items-center gap-3 rounded-xl bg-surface-variant/30 px-4 py-3"
-        >
+        <div v-for="(item, idx) in files" :key="idx" class="flex items-center gap-3 rounded-xl bg-surface-variant/30 px-4 py-3">
           <img :src="item.preview" class="h-12 w-12 rounded-lg object-cover" />
           <div class="min-w-0 flex-1">
             <div class="truncate text-sm font-medium text-on-surface">{{ item.file.name }}</div>
             <div class="text-xs text-on-surface-variant">
               <template v-if="batchOp === 'compress'">
                 原 {{ formatSize(item.file.size) }}
-                <span v-if="item.resultFile">
-                  → 压缩后 {{ formatSize(item.resultFile.size) }} ({{ item.ratio }})
-                </span>
+                <span v-if="item.resultFile">→ 压缩后 {{ formatSize(item.resultFile.size) }} ({{ item.ratio }})</span>
                 <span v-else-if="item.loading" class="text-primary">压缩中...</span>
                 <span v-else-if="item.error" class="text-error">{{ item.error }}</span>
               </template>
@@ -515,24 +422,15 @@ const batchOpLabel = computed(() => {
             </div>
           </div>
           <div class="flex items-center gap-1">
-            <button
-              v-if="item.resultUrl"
-              @click="downloadItem(item)"
-              class="rounded-full p-1.5 hover:bg-surface-variant text-primary"
-              title="下载"
-            >
+            <button v-if="item.resultUrl" @click="downloadItem(item)" class="rounded-full p-1.5 hover:bg-surface-variant text-primary" title="下载">
               <Download class="h-4 w-4" />
             </button>
-            <button
-              @click="removeItem(idx)"
-              class="rounded-full p-1.5 hover:bg-surface-variant text-on-surface-variant"
-              title="移除"
-            >
+            <button @click="removeItem(idx)" class="rounded-full p-1.5 hover:bg-surface-variant text-on-surface-variant" title="移除">
               <Trash2 class="h-4 w-4" />
             </button>
           </div>
         </div>
       </div>
-    </div>
-  </div>
+    </ToolCard>
+  </ToolLayout>
 </template>

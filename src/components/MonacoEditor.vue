@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import * as monaco from 'monaco-editor'
-import '@/utils/monaco'
-import { useThemeStore } from '@/stores/theme'
+import { applyChineseLocale } from '@/utils/monaco'
+import { usePreferenceStore } from '@/stores/preference'
 
 const props = defineProps<{
   modelValue?: string
@@ -25,13 +25,14 @@ const containerRef = ref<HTMLDivElement | null>(null)
 let editorInstance: monaco.editor.IStandaloneCodeEditor | monaco.editor.IStandaloneDiffEditor | null = null
 let originalModel: monaco.editor.ITextModel | null = null
 let modifiedModel: monaco.editor.ITextModel | null = null
-const themeStore = useThemeStore()
+const preference = usePreferenceStore()
 
 function getTheme() {
-  return themeStore.isDark ? 'vs-dark' : 'vs'
+  return preference.isDark ? 'vs-dark' : 'vs'
 }
 
 onMounted(() => {
+  applyChineseLocale()
   if (!containerRef.value) return
 
   if (props.diff) {
@@ -79,7 +80,7 @@ onMounted(() => {
 })
 
 watch(
-  () => themeStore.isDark,
+  () => preference.isDark,
   () => {
     monaco.editor.setTheme(getTheme())
   },

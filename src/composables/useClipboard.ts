@@ -1,0 +1,33 @@
+import { ref } from 'vue'
+import { copyToClipboard as copyUtil } from '@/utils/clipboard'
+
+export function useClipboard(timeout = 1500) {
+  const copied = ref(false)
+  let timer: ReturnType<typeof setTimeout> | null = null
+
+  async function copy(text: string, msg?: string): Promise<boolean> {
+    const ok = await copyUtil(text, msg)
+    if (ok) {
+      copied.value = true
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => {
+        copied.value = false
+      }, timeout)
+    }
+    return ok
+  }
+
+  function reset() {
+    copied.value = false
+    if (timer) {
+      clearTimeout(timer)
+      timer = null
+    }
+  }
+
+  return {
+    copied,
+    copy,
+    reset,
+  }
+}
