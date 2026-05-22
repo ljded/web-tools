@@ -1,45 +1,83 @@
 @import 'tailwindcss';
 
 @theme {
-  /* ── 亮色主题令牌 ── */
-  --color-primary: light-dark(#007aff, #0a84ff);
-  --color-on-primary: light-dark(#ffffff, #ffffff);
-  --color-primary-container: light-dark(#e6f2ff, #001a33);
-  --color-on-primary-container: light-dark(#001a33, #e6f2ff);
+  /* ── 亮色主题令牌（默认） ── */
+  --color-primary: #007aff;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #e6f2ff;
+  --color-on-primary-container: #001a33;
 
-  --color-secondary: light-dark(#5e5ce6, #5e5ce6);
-  --color-on-secondary: light-dark(#ffffff, #ffffff);
-  --color-secondary-container: light-dark(#eeebff, #0d0b33);
-  --color-on-secondary-container: light-dark(#0d0b33, #eeebff);
+  --color-secondary: #5e5ce6;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #eeebff;
+  --color-on-secondary-container: #0d0b33;
 
-  --color-tertiary: light-dark(#ff9500, #ff9f0a);
-  --color-on-tertiary: light-dark(#ffffff, #ffffff);
-  --color-tertiary-container: light-dark(#fff4e5, #331e00);
-  --color-on-tertiary-container: light-dark(#331e00, #fff4e5);
+  --color-tertiary: #ff9500;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #fff4e5;
+  --color-on-tertiary-container: #331e00;
 
-  --color-error: light-dark(#ff3b30, #ff453a);
-  --color-on-error: light-dark(#ffffff, #ffffff);
-  --color-error-container: light-dark(#ffebeb, #330b09);
-  --color-on-error-container: light-dark(#330b09, #ffebeb);
+  --color-error: #ff3b30;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffebeb;
+  --color-on-error-container: #330b09;
 
-  --color-success: light-dark(#34c759, #30d158);
-  --color-on-success: light-dark(#ffffff, #ffffff);
-  --color-success-container: light-dark(#ebf9ef, #0b3315);
-  --color-on-success-container: light-dark(#0b3315, #ebf9ef);
+  --color-success: #34c759;
+  --color-on-success: #ffffff;
+  --color-success-container: #ebf9ef;
+  --color-on-success-container: #0b3315;
 
-  --color-surface: light-dark(#ffffff, #1c1c1e);
-  --color-on-surface: light-dark(#1c1c1e, #ffffff);
-  --color-surface-variant: light-dark(#f2f2f7, #2c2c2e);
-  --color-on-surface-variant: light-dark(#636366, #8e8e93);
+  --color-surface: #ffffff;
+  --color-on-surface: #1c1c1e;
+  --color-surface-variant: #f2f2f7;
+  --color-on-surface-variant: #636366;
 
-  --color-outline: light-dark(#c7c7cc, #48484a);
-  --color-outline-variant: light-dark(#e5e5ea, #3a3a3c);
+  --color-outline: #c7c7cc;
+  --color-outline-variant: #e5e5ea;
 
-  --color-background: light-dark(#f2f2f7, #000000);
-  --color-on-background: light-dark(#1c1c1e, #ffffff);
+  --color-background: #f2f2f7;
+  --color-on-background: #1c1c1e;
 
-  --color-inverse-surface: light-dark(#1c1c1e, #f2f2f7);
-  --color-inverse-on-surface: light-dark(#f2f2f7, #1c1c1e);
+  --color-inverse-surface: #1c1c1e;
+  --color-inverse-on-surface: #f2f2f7;
+}
+
+/* ── 暗色主题覆盖 ── */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #0a84ff;
+    --color-primary-container: #001a33;
+    --color-on-primary-container: #e6f2ff;
+
+    --color-secondary-container: #0d0b33;
+    --color-on-secondary-container: #eeebff;
+
+    --color-tertiary: #ff9f0a;
+    --color-tertiary-container: #331e00;
+    --color-on-tertiary-container: #fff4e5;
+
+    --color-error: #ff453a;
+    --color-error-container: #330b09;
+    --color-on-error-container: #ffebeb;
+
+    --color-success: #30d158;
+    --color-success-container: #0b3315;
+    --color-on-success-container: #ebf9ef;
+
+    --color-surface: #1c1c1e;
+    --color-on-surface: #ffffff;
+    --color-surface-variant: #2c2c2e;
+    --color-on-surface-variant: #8e8e93;
+
+    --color-outline: #48484a;
+    --color-outline-variant: #3a3a3c;
+
+    --color-background: #000000;
+    --color-on-background: #ffffff;
+
+    --color-inverse-surface: #f2f2f7;
+    --color-inverse-on-surface: #1c1c1e;
+  }
 }
 
 @layer base {
