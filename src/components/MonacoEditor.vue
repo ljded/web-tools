@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import * as monaco from 'monaco-editor'
+import { useColorMode } from '@vueuse/core'
 import { applyChineseLocale } from '@/utils/monaco'
-import { usePreferenceStore } from '@/stores/preference'
 
 const props = defineProps<{
   modelValue?: string
@@ -25,10 +25,10 @@ const containerRef = ref<HTMLDivElement | null>(null)
 let editorInstance: monaco.editor.IStandaloneCodeEditor | monaco.editor.IStandaloneDiffEditor | null = null
 let originalModel: monaco.editor.ITextModel | null = null
 let modifiedModel: monaco.editor.ITextModel | null = null
-const preference = usePreferenceStore()
+const colorMode = useColorMode()
 
 function getTheme() {
-  return preference.isDark ? 'vs-dark' : 'vs'
+  return colorMode.value === 'dark' ? 'vs-dark' : 'vs'
 }
 
 onMounted(() => {
@@ -80,7 +80,7 @@ onMounted(() => {
 })
 
 watch(
-  () => preference.isDark,
+  () => colorMode.value,
   () => {
     monaco.editor.setTheme(getTheme())
   },

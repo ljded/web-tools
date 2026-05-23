@@ -1,16 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import {
-  Upload,
-  Download,
-  Image as ImageIcon,
-  Trash2,
-  RotateCw,
-  Scissors,
-  Type,
-  Maximize,
-  FileImage,
-} from '@lucide/vue'
 import { usePersistedRef } from '@/utils/persist'
 import { compressImageFile } from '@/utils/imageCompression'
 import ToolLayout from '@/components/ToolLayout.vue'
@@ -31,35 +20,26 @@ interface FileItem {
 
 const files = ref<FileItem[]>([])
 
-const batchOp = usePersistedRef<'compress' | 'format' | 'resize' | 'watermark' | 'rotate' | 'crop'>(
-  'web-tools:image:batch-op',
-  'compress',
-)
+const batchOp = usePersistedRef<'compress' | 'format' | 'resize' | 'watermark' | 'rotate' | 'crop'>('web-tools:image:batch-op', 'compress')
 
-// compress
 const quality = usePersistedRef('web-tools:image:quality', 0.8)
 const maxWidth = usePersistedRef('web-tools:image:max-width', 1920)
 const maxHeight = usePersistedRef('web-tools:image:max-height', 1080)
 
-// format
 const targetFormat = usePersistedRef<'image/png' | 'image/jpeg' | 'image/webp'>('web-tools:image:target-format', 'image/jpeg')
 
-// resize
 const resizeWidth = usePersistedRef('web-tools:image:resize-width', 800)
 const resizeHeight = usePersistedRef('web-tools:image:resize-height', 600)
 const keepRatio = usePersistedRef('web-tools:image:keep-ratio', true)
 
-// watermark
 const wmText = usePersistedRef('web-tools:image:wm-text', 'Watermark')
 const wmSize = usePersistedRef('web-tools:image:wm-size', 24)
 const wmColor = usePersistedRef('web-tools:image:wm-color', '#ffffff')
 const wmOpacity = usePersistedRef('web-tools:image:wm-opacity', 0.5)
 const wmPos = usePersistedRef<'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('web-tools:image:wm-pos', 'bottom-right')
 
-// rotate
 const rotateDeg = usePersistedRef<90 | 180 | 270>('web-tools:image:rotate-deg', 90)
 
-// crop
 const cropTop = usePersistedRef('web-tools:image:crop-top', 0)
 const cropBottom = usePersistedRef('web-tools:image:crop-bottom', 0)
 const cropLeft = usePersistedRef('web-tools:image:crop-left', 0)
@@ -75,22 +55,13 @@ function addFiles(fileList: File[]) {
   const valid = fileList.filter((f) => f.type.startsWith('image/'))
   valid.forEach((file) => {
     const reader = new FileReader()
-    reader.onload = () => {
-      files.value.push({ file, preview: reader.result as string })
-    }
+    reader.onload = () => { files.value.push({ file, preview: reader.result as string }) }
     reader.readAsDataURL(file)
   })
 }
 
-function handleFiles(e: Event) {
-  addFiles(Array.from((e.target as HTMLInputElement).files || []))
-}
-
-function handleDrop(e: DragEvent) {
-  e.preventDefault()
-  addFiles(Array.from(e.dataTransfer?.files || []))
-}
-
+function handleFiles(e: Event) { addFiles(Array.from((e.target as HTMLInputElement).files || [])) }
+function handleDrop(e: DragEvent) { e.preventDefault(); addFiles(Array.from(e.dataTransfer?.files || [])) }
 function removeItem(idx: number) {
   const item = files.value[idx]
   if (item?.resultUrl) URL.revokeObjectURL(item.resultUrl)
@@ -99,99 +70,61 @@ function removeItem(idx: number) {
 
 async function processAll() {
   if (!files.value.length) return
-
   if (batchOp.value === 'compress') {
     for (let i = 0; i < files.value.length; i++) {
       const item = files.value[i]!
       if (item.resultFile || item.loading) continue
-      item.loading = true
-      item.error = ''
+      item.loading = true; item.error = ''
       try {
         const options = {
           maxWidthOrHeight: Math.min(Math.max(maxWidth.value, maxHeight.value), 4096),
           initialQuality: Math.min(Math.max(quality.value, 0.1), 1),
         }
         const file = await compressImageFile(item.file, options)
-        item.resultFile = file
-        item.resultUrl = URL.createObjectURL(file)
+        item.resultFile = file; item.resultUrl = URL.createObjectURL(file)
         item.resultName = item.file.name.replace(/\.[^.]+$/, '') + '_compressed.jpg'
         const r = (1 - file.size / item.file.size) * 100
         item.ratio = r.toFixed(1) + '%'
-      } catch (e: any) {
-        item.error = '失败'
-      } finally {
-        item.loading = false
-      }
+      } catch (e: any) { item.error = '失败' }
+      finally { item.loading = false }
     }
   } else {
     files.value.forEach((item) => {
       if (item.processing) return
-      if (item.resultUrl) {
-        URL.revokeObjectURL(item.resultUrl)
-        item.resultUrl = undefined
-        item.resultName = undefined
-        item.resultFile = undefined
-        item.ratio = undefined
-      }
-      item.processing = true
-      item.error = ''
+      if (item.resultUrl) { URL.revokeObjectURL(item.resultUrl); item.resultUrl = undefined; item.resultName = undefined; item.resultFile = undefined; item.ratio = undefined }
+      item.processing = true; item.error = ''
       const img = new window.Image()
       img.onload = () => {
         const canvas = document.createElement('canvas')
         const ctx = canvas.getContext('2d')!
-        let w = img.width
-        let h = img.height
+        let w = img.width, h = img.height
 
         if (batchOp.value === 'resize') {
-          if (keepRatio.value) {
-            const ratio = Math.min(resizeWidth.value / w, resizeHeight.value / h)
-            w = Math.round(w * ratio)
-            h = Math.round(h * ratio)
-          } else {
-            w = resizeWidth.value
-            h = resizeHeight.value
-          }
-          canvas.width = w
-          canvas.height = h
+          if (keepRatio.value) { const ratio = Math.min(resizeWidth.value / w, resizeHeight.value / h); w = Math.round(w * ratio); h = Math.round(h * ratio) }
+          else { w = resizeWidth.value; h = resizeHeight.value }
+          canvas.width = w; canvas.height = h
           ctx.drawImage(img, 0, 0, w, h)
         } else if (batchOp.value === 'rotate') {
           const deg = rotateDeg.value
-          if (deg === 90 || deg === 270) {
-            canvas.width = h
-            canvas.height = w
-          } else {
-            canvas.width = w
-            canvas.height = h
-          }
+          if (deg === 90 || deg === 270) { canvas.width = h; canvas.height = w }
+          else { canvas.width = w; canvas.height = h }
           ctx.translate(canvas.width / 2, canvas.height / 2)
           ctx.rotate((deg * Math.PI) / 180)
           ctx.drawImage(img, -w / 2, -h / 2)
         } else if (batchOp.value === 'crop') {
-          const sx = Math.min(cropLeft.value, w - 1)
-          const sy = Math.min(cropTop.value, h - 1)
-          const sw = Math.max(1, w - sx - cropRight.value)
-          const sh = Math.max(1, h - sy - cropBottom.value)
-          canvas.width = sw
-          canvas.height = sh
+          const sx = Math.min(cropLeft.value, w - 1), sy = Math.min(cropTop.value, h - 1)
+          const sw = Math.max(1, w - sx - cropRight.value), sh = Math.max(1, h - sy - cropBottom.value)
+          canvas.width = sw; canvas.height = sh
           ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
-          w = sw
-          h = sh
-        } else {
-          canvas.width = w
-          canvas.height = h
-          ctx.drawImage(img, 0, 0)
-        }
+          w = sw; h = sh
+        } else { canvas.width = w; canvas.height = h; ctx.drawImage(img, 0, 0) }
 
         if (batchOp.value === 'watermark') {
-          ctx.save()
-          ctx.globalAlpha = Math.min(Math.max(wmOpacity.value, 0), 1)
+          ctx.save(); ctx.globalAlpha = Math.min(Math.max(wmOpacity.value, 0), 1)
           ctx.fillStyle = wmColor.value
           ctx.font = `${wmSize.value}px sans-serif`
-          const metrics = ctx.measureText(wmText.value)
-          const tw = metrics.width
-          const th = wmSize.value
-          let x = 0, y = 0
-          const padding = 16
+          const metrics = ctx.measureText(wmText.value); const tw = metrics.width; const th = wmSize.value
+          let x = 0, y = 0; const padding = 16
           switch (wmPos.value) {
             case 'top-left': x = padding; y = padding + th; break
             case 'top-right': x = w - tw - padding; y = padding + th; break
@@ -199,236 +132,143 @@ async function processAll() {
             case 'bottom-right': x = w - tw - padding; y = h - padding; break
             case 'center': x = (w - tw) / 2; y = (h + th) / 2; break
           }
-          ctx.fillText(wmText.value, x, y)
-          ctx.restore()
+          ctx.fillText(wmText.value, x, y); ctx.restore()
         }
 
-        const outFormat = batchOp.value === 'format' ? targetFormat.value : item.file.type
-        const ext = outFormat === 'image/png' ? 'png' : outFormat === 'image/webp' ? 'webp' : 'jpg'
-        const baseName = item.file.name.replace(/\.[^.]+$/, '')
         canvas.toBlob(
           (blob) => {
-            if (!blob) {
-              item.error = '导出失败'
-              item.processing = false
-              return
-            }
+            if (!blob) { item.error = '导出失败'; item.processing = false; return }
+            if (batchOp.value === 'format') {
+              const extMap: Record<string, string> = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }
+              item.resultName = item.file.name.replace(/\.[^.]+$/, '') + (extMap[targetFormat.value] || '.jpg')
+            } else if (batchOp.value === 'resize') item.resultName = item.file.name.replace(/\.[^.]+$/, '') + '_resized.jpg'
+            else if (batchOp.value === 'rotate') item.resultName = item.file.name.replace(/\.[^.]+$/, '') + '_rotated.jpg'
+            else if (batchOp.value === 'crop') item.resultName = item.file.name.replace(/\.[^.]+$/, '') + '_cropped.jpg'
+            else if (batchOp.value === 'watermark') item.resultName = item.file.name.replace(/\.[^.]+$/, '') + '_watermarked.jpg'
+            item.resultFile = new File([blob], item.resultName || 'output.jpg', { type: batchOp.value === 'format' ? targetFormat.value : 'image/jpeg' })
             item.resultUrl = URL.createObjectURL(blob)
-            item.resultName = `${baseName}_${batchOp.value}.${ext}`
             item.processing = false
           },
-          outFormat,
-          0.92,
+          batchOp.value === 'format' ? targetFormat.value : 'image/jpeg',
+          0.9,
         )
       }
-      img.onerror = () => {
-        item.error = '加载失败'
-        item.processing = false
-      }
+      img.onerror = () => { item.error = '加载失败'; item.processing = false }
       img.src = item.preview
     })
   }
 }
 
 function downloadItem(item: FileItem) {
-  if (!item.resultUrl) return
+  if (!item.resultFile || !item.resultUrl) return
   const link = document.createElement('a')
-  link.download = item.resultName || 'image.png'
-  link.href = item.resultUrl
+  link.href = item.resultUrl; link.download = item.resultName || 'output.jpg'
   link.click()
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
-  return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
-}
-
-const batchOpLabel = computed(() => {
-  const map: Record<string, string> = {
-    compress: '图片压缩', format: '格式转换', resize: '尺寸修改',
-    watermark: '添加水印', rotate: '旋转', crop: '裁剪',
-  }
-  return map[batchOp.value] || batchOp.value
-})
+const ops = [
+  { value: 'compress' as const, label: '压缩', icon: 'i-lucide-minimize-2' },
+  { value: 'format' as const, label: '转格式', icon: 'i-lucide-image' },
+  { value: 'resize' as const, label: '缩放', icon: 'i-lucide-maximize' },
+  { value: 'watermark' as const, label: '水印', icon: 'i-lucide-type' },
+  { value: 'rotate' as const, label: '旋转', icon: 'i-lucide-rotate-cw' },
+  { value: 'crop' as const, label: '裁剪', icon: 'i-lucide-scissors' },
+]
 </script>
 
 <template>
   <ToolLayout max-width="5xl">
-    <ToolHeader title="图片处理" description="批量压缩、格式转换、尺寸修改、水印、旋转、裁剪" :icon="ImageIcon" />
+    <ToolHeader title="图片工具" description="批量压缩、格式转换、缩放、水印、旋转、裁剪" icon="i-lucide-image">
+      <template #actions>
+        <UTabs v-model="batchOp" :items="ops.map(o => ({ label: o.label, value: o.value, icon: o.icon }))" />
+      </template>
+    </ToolHeader>
 
-    <!-- 操作选择 -->
-    <div class="flex flex-wrap gap-2">
-      <button
-        v-for="op in [
-          { key: 'compress', label: '图片压缩', icon: FileImage },
-          { key: 'format', label: '格式转换', icon: FileImage },
-          { key: 'resize', label: '尺寸修改', icon: Maximize },
-          { key: 'watermark', label: '添加水印', icon: Type },
-          { key: 'rotate', label: '旋转', icon: RotateCw },
-          { key: 'crop', label: '裁剪', icon: Scissors },
-        ] as const"
-        :key="op.key"
-        @click="batchOp = op.key"
-        class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors"
-        :class="batchOp === op.key ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-variant text-on-surface-variant hover:bg-surface-variant/80'"
+    <!-- 参数面板 -->
+    <ToolCard title="处理参数" compact>
+      <div class="flex flex-wrap items-end gap-4">
+        <template v-if="batchOp === 'compress'">
+          <UFormField label="质量">
+            <USlider v-model="quality" :min="0.1" :max="1" :step="0.1" class="w-32" />
+            <span class="text-xs text-muted">{{ Math.round(quality * 100) }}%</span>
+          </UFormField>
+          <UFormField label="最大宽高">
+            <UInput v-model.number="maxWidth" class="w-24" />
+          </UFormField>
+        </template>
+
+        <template v-if="batchOp === 'format'">
+          <USelect v-model="targetFormat" :items="[{ label: 'JPEG', value: 'image/jpeg' }, { label: 'PNG', value: 'image/png' }, { label: 'WebP', value: 'image/webp' }]" label="目标格式" />
+        </template>
+
+        <template v-if="batchOp === 'resize'">
+          <UFormField label="宽度"><UInput v-model.number="resizeWidth" class="w-24" /></UFormField>
+          <UFormField label="高度"><UInput v-model.number="resizeHeight" class="w-24" /></UFormField>
+          <UCheckbox v-model="keepRatio" label="保持比例" />
+        </template>
+
+        <template v-if="batchOp === 'watermark'">
+          <UFormField label="文字"><UInput v-model="wmText" class="w-40" /></UFormField>
+          <UFormField :label="`大小: ${wmSize}`"><USlider v-model="wmSize" :min="12" :max="72" :step="1" class="w-28" /></UFormField>
+          <USelect v-model="wmPos" :items="[{ label: '居中', value: 'center' }, { label: '左上', value: 'top-left' }, { label: '右上', value: 'top-right' }, { label: '左下', value: 'bottom-left' }, { label: '右下', value: 'bottom-right' }]" label="位置" />
+        </template>
+
+        <template v-if="batchOp === 'rotate'">
+          <USelect v-model="rotateDeg" :items="[{ label: '90°', value: 90 }, { label: '180°', value: 180 }, { label: '270°', value: 270 }]" label="旋转角度" />
+        </template>
+
+        <template v-if="batchOp === 'crop'">
+          <div class="flex gap-2">
+            <UFormField label="上"><UInput v-model.number="cropTop" class="w-20" /></UFormField>
+            <UFormField label="右"><UInput v-model.number="cropRight" class="w-20" /></UFormField>
+            <UFormField label="下"><UInput v-model.number="cropBottom" class="w-20" /></UFormField>
+            <UFormField label="左"><UInput v-model.number="cropLeft" class="w-20" /></UFormField>
+          </div>
+        </template>
+      </div>
+    </ToolCard>
+
+    <!-- 上传+处理 -->
+    <ToolCard title="上传与处理" compact>
+      <template #actions>
+        <UButton color="primary" @click="processAll" :disabled="!files.length" class="rounded-full px-5 py-2.5 text-sm">
+          <template #leading><UIcon name="i-lucide-play" class="size-4" /></template>全部处理
+        </UButton>
+      </template>
+      <div
+        class="flex h-32 items-center justify-center rounded-2xl border-2 border-dashed border-default p-4 transition-colors hover:border-primary"
+        @dragover.prevent @drop="handleDrop"
+        @click="triggerUpload"
       >
-        <component :is="op.icon" class="h-3.5 w-3.5" />
-        {{ op.label }}
-      </button>
-    </div>
-
-    <ToolCard>
-      <!-- 上传 -->
-      <div class="flex items-center justify-center">
-        <button
-          @click="triggerUpload"
-          @dragover.prevent
-          @drop="handleDrop"
-          class="flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-outline p-8 transition-colors hover:border-primary hover:bg-primary-container/30"
-        >
-          <Upload class="h-8 w-8 text-primary" />
-          <span class="text-sm font-medium text-on-surface">点击或拖拽上传图片</span>
-          <span class="text-xs text-on-surface-variant">支持批量上传</span>
-        </button>
+        <div class="text-center">
+          <UIcon name="i-lucide-upload" class="mx-auto size-6 text-muted" />
+          <span class="mt-1 block text-xs text-muted">拖拽图片或点击上传</span>
+        </div>
         <input id="image-upload" type="file" accept="image/*" multiple class="hidden" @change="handleFiles" />
       </div>
 
-      <!-- 参数区 -->
-      <div class="rounded-xl bg-surface-variant/30 p-4 flex flex-col gap-3">
-        <div class="text-xs font-medium text-on-surface-variant">{{ batchOpLabel }}参数</div>
-
-        <!-- 压缩 -->
-        <div v-if="batchOp === 'compress'" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div>
-            <label class="mb-1 block text-sm text-on-surface-variant">最大宽度</label>
-            <input v-model.number="maxWidth" type="number" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-on-surface-variant">最大高度</label>
-            <input v-model.number="maxHeight" type="number" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-on-surface-variant">质量</label>
-            <input v-model.number="quality" type="range" min="0.1" max="1" step="0.05" class="h-10 w-full" />
-            <div class="text-right text-xs text-on-surface-variant">{{ (quality * 100).toFixed(0) }}%</div>
-          </div>
-        </div>
-
-        <!-- 格式转换 -->
-        <div v-if="batchOp === 'format'" class="flex items-center gap-3">
-          <label class="text-sm text-on-surface">目标格式</label>
-          <select v-model="targetFormat" class="h-10 rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none focus:border-primary focus:ring-2 focus:ring-primary/20">
-            <option value="image/jpeg">JPEG</option>
-            <option value="image/png">PNG</option>
-            <option value="image/webp">WebP</option>
-          </select>
-        </div>
-
-        <!-- 尺寸 -->
-        <div v-if="batchOp === 'resize'" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">目标宽度</label>
-            <input v-model.number="resizeWidth" type="number" min="1" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none" />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">目标高度</label>
-            <input v-model.number="resizeHeight" type="number" min="1" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none" />
-          </div>
-          <div class="flex items-end">
-            <label class="flex items-center gap-2 text-sm text-on-surface">
-              <input v-model="keepRatio" type="checkbox" class="h-4 w-4 accent-primary" />
-              保持比例
-            </label>
-          </div>
-        </div>
-
-        <!-- 水印 -->
-        <div v-if="batchOp === 'watermark'" class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">水印文字</label>
-            <input v-model="wmText" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none" />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">位置</label>
-            <select v-model="wmPos" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none">
-              <option value="center">居中</option>
-              <option value="top-left">左上</option>
-              <option value="top-right">右上</option>
-              <option value="bottom-left">左下</option>
-              <option value="bottom-right">右下</option>
-            </select>
-          </div>
-          <div class="flex items-center gap-3">
-            <label class="text-xs text-on-surface-variant">颜色</label>
-            <input v-model="wmColor" type="color" class="h-8 w-8 rounded border border-outline bg-transparent p-0.5" />
-            <span class="text-xs text-on-surface">{{ wmColor }}</span>
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">字号: {{ wmSize }}px</label>
-            <input v-model.number="wmSize" type="range" min="12" max="120" class="h-6 w-full" />
-          </div>
-          <div>
-            <label class="mb-1 block text-xs text-on-surface-variant">透明度: {{ (wmOpacity * 100).toFixed(0) }}%</label>
-            <input v-model.number="wmOpacity" type="range" min="0.05" max="1" step="0.05" class="h-6 w-full" />
-          </div>
-        </div>
-
-        <!-- 旋转 -->
-        <div v-if="batchOp === 'rotate'" class="flex items-center gap-3">
-          <label v-for="d in [90, 180, 270] as const" :key="d" class="flex items-center gap-1.5 text-sm text-on-surface">
-            <input v-model.number="rotateDeg" type="radio" :value="d" class="accent-primary" />
-            {{ d }}°
-          </label>
-        </div>
-
-        <!-- 裁剪 -->
-        <div v-if="batchOp === 'crop'" class="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div v-for="dir in ['top', 'bottom', 'left', 'right'] as const" :key="dir">
-            <label class="mb-1 block text-xs text-on-surface-variant">{{ {top:'顶部',bottom:'底部',left:'左侧',right:'右侧'}[dir] }} (px)</label>
-            <input v-model.number="$refs[dir]" type="number" min="0" class="h-10 w-full rounded-lg border border-outline bg-transparent px-3 text-sm text-on-surface outline-none" />
-          </div>
-        </div>
-      </div>
-
-      <button
-        @click="processAll"
-        :disabled="!files.length"
-        class="flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-on-primary shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
-      >
-        <ImageIcon class="h-4 w-4" />
-        {{ batchOp === 'compress' ? '开始批量压缩' : '开始处理' }}
-      </button>
-
-      <!-- 文件列表 -->
-      <div v-if="files.length" class="space-y-3">
-        <div v-for="(item, idx) in files" :key="idx" class="flex items-center gap-3 rounded-xl bg-surface-variant/30 px-4 py-3">
-          <img :src="item.preview" class="h-12 w-12 rounded-lg object-cover" />
+      <div v-if="files.length" class="mt-4 space-y-3">
+        <div v-for="(item, i) in files" :key="i" class="flex items-center gap-3 rounded-xl bg-elevated p-3">
+          <img :src="item.preview" class="h-16 w-16 shrink-0 rounded-lg object-cover" />
           <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-medium text-on-surface">{{ item.file.name }}</div>
-            <div class="text-xs text-on-surface-variant">
-              <template v-if="batchOp === 'compress'">
-                原 {{ formatSize(item.file.size) }}
-                <span v-if="item.resultFile">→ 压缩后 {{ formatSize(item.resultFile.size) }} ({{ item.ratio }})</span>
-                <span v-else-if="item.loading" class="text-primary">压缩中...</span>
-                <span v-else-if="item.error" class="text-error">{{ item.error }}</span>
-              </template>
-              <template v-else>
-                <span v-if="item.processing" class="text-primary">处理中...</span>
-                <span v-else-if="item.error" class="text-error">{{ item.error }}</span>
-                <span v-else-if="item.resultUrl" class="text-green-600">已完成</span>
-                <span v-else>待处理</span>
-              </template>
+            <div class="truncate text-sm">{{ item.file.name }}</div>
+            <UBadge v-if="item.error" color="error" variant="soft" size="xs">{{ item.error }}</UBadge>
+            <UBadge v-else-if="item.loading" color="info" variant="soft" size="xs">压缩中...</UBadge>
+            <UBadge v-else-if="item.processing" color="info" variant="soft" size="xs">处理中...</UBadge>
+            <div v-else-if="item.resultFile" class="text-xs text-success">
+              已完成
+              <span v-if="item.ratio" class="ml-1">(-{{ item.ratio }})</span>
             </div>
           </div>
-          <div class="flex items-center gap-1">
-            <button v-if="item.resultUrl" @click="downloadItem(item)" class="rounded-full p-1.5 hover:bg-surface-variant text-primary" title="下载">
-              <Download class="h-4 w-4" />
-            </button>
-            <button @click="removeItem(idx)" class="rounded-full p-1.5 hover:bg-surface-variant text-on-surface-variant" title="移除">
-              <Trash2 class="h-4 w-4" />
-            </button>
-          </div>
+          <UButton
+            v-if="item.resultFile && item.resultUrl"
+            color="primary"
+            variant="ghost"
+            icon="i-lucide-download"
+            @click="downloadItem(item)"
+            class="rounded-full"
+          />
+          <UButton color="neutral" variant="ghost" icon="i-lucide-trash2" @click="removeItem(i)" class="rounded-full" />
         </div>
       </div>
     </ToolCard>

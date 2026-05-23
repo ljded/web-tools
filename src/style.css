@@ -1,106 +1,40 @@
 @import 'tailwindcss';
-
-@theme {
-  /* ── 亮色主题令牌（默认） ── */
-  --color-primary: #007aff;
-  --color-on-primary: #ffffff;
-  --color-primary-container: #e6f2ff;
-  --color-on-primary-container: #001a33;
-
-  --color-secondary: #5e5ce6;
-  --color-on-secondary: #ffffff;
-  --color-secondary-container: #eeebff;
-  --color-on-secondary-container: #0d0b33;
-
-  --color-tertiary: #ff9500;
-  --color-on-tertiary: #ffffff;
-  --color-tertiary-container: #fff4e5;
-  --color-on-tertiary-container: #331e00;
-
-  --color-error: #ff3b30;
-  --color-on-error: #ffffff;
-  --color-error-container: #ffebeb;
-  --color-on-error-container: #330b09;
-
-  --color-success: #34c759;
-  --color-on-success: #ffffff;
-  --color-success-container: #ebf9ef;
-  --color-on-success-container: #0b3315;
-
-  --color-surface: #ffffff;
-  --color-on-surface: #1c1c1e;
-  --color-surface-variant: #f2f2f7;
-  --color-on-surface-variant: #636366;
-
-  --color-outline: #c7c7cc;
-  --color-outline-variant: #e5e5ea;
-
-  --color-background: #f2f2f7;
-  --color-on-background: #1c1c1e;
-
-  --color-inverse-surface: #1c1c1e;
-  --color-inverse-on-surface: #f2f2f7;
-}
-
-/* ── 暗色主题覆盖 ── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-primary: #0a84ff;
-    --color-primary-container: #001a33;
-    --color-on-primary-container: #e6f2ff;
-
-    --color-secondary-container: #0d0b33;
-    --color-on-secondary-container: #eeebff;
-
-    --color-tertiary: #ff9f0a;
-    --color-tertiary-container: #331e00;
-    --color-on-tertiary-container: #fff4e5;
-
-    --color-error: #ff453a;
-    --color-error-container: #330b09;
-    --color-on-error-container: #ffebeb;
-
-    --color-success: #30d158;
-    --color-success-container: #0b3315;
-    --color-on-success-container: #ebf9ef;
-
-    --color-surface: #1c1c1e;
-    --color-on-surface: #ffffff;
-    --color-surface-variant: #2c2c2e;
-    --color-on-surface-variant: #8e8e93;
-
-    --color-outline: #48484a;
-    --color-outline-variant: #3a3a3c;
-
-    --color-background: #000000;
-    --color-on-background: #ffffff;
-
-    --color-inverse-surface: #f2f2f7;
-    --color-inverse-on-surface: #1c1c1e;
-  }
-}
+@import '@nuxt/ui';
 
 @layer base {
   body {
-    background-color: var(--color-background);
-    color: var(--color-on-background);
-    font-family:
-      -apple-system,
-      BlinkMacSystemFont,
-      'SF Pro Text',
-      'SF Pro Display',
-      'Helvetica Neue',
-      system-ui,
-      sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+      'Helvetica Neue', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Monaco 编辑器搜索框悬浮不裁剪 */
+  ::selection {
+    background-color: var(--ui-color-primary-500);
+    color: var(--ui-color-primary-contrast);
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--ui-color-neutral-300);
+    border-radius: 3px;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: var(--ui-color-neutral-600);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--ui-color-neutral-400);
+  }
+
   .monaco-editor .find-widget {
     z-index: 50 !important;
   }
-  /* 抑制浏览器原生 title tooltip 干扰关闭按钮点击 */
   .monaco-editor .find-widget .codicon-close {
     pointer-events: auto;
   }

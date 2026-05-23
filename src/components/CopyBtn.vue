@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Copy, Check } from '@lucide/vue'
 import { useClipboard } from '@/composables'
 
 interface Props {
@@ -7,11 +6,15 @@ interface Props {
   msg?: string
   size?: 'sm' | 'md'
   variant?: 'ghost' | 'button'
+  compact?: boolean
+  disabled?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   size: 'sm',
   variant: 'ghost',
+  compact: false,
+  disabled: false,
 })
 
 const { copied, copy } = useClipboard()
@@ -22,18 +25,21 @@ async function handleCopy() {
 </script>
 
 <template>
-  <button
-    @click="handleCopy"
-    class="flex items-center gap-1 transition-colors"
+  <UButton
+    type="button"
+    color="neutral"
+    variant="ghost"
+    size="xs"
+    :disabled="disabled || !text"
+    :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
     :class="[
       variant === 'button'
-        ? 'rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container'
-        : 'rounded-full p-1.5 hover:bg-surface-variant',
-      size === 'sm' ? 'text-xs' : 'text-sm',
+        ? 'text-primary hover:bg-primary/10'
+        : 'text-muted hover:bg-elevated',
+      compact ? 'p-1' : 'px-2 py-1',
     ]"
+    @click="handleCopy"
   >
-    <Check v-if="copied" class="h-3.5 w-3.5 text-primary" />
-    <Copy v-else class="h-3.5 w-3.5 text-on-surface-variant" />
-    <span v-if="variant === 'button'">{{ copied ? '已复制' : '复制' }}</span>
-  </button>
+    <span v-if="!compact" class="text-xs">{{ copied ? '已复制' : '复制' }}</span>
+  </UButton>
 </template>

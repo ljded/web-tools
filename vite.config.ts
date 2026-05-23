@@ -16,9 +16,11 @@ export default defineConfig({
       ui: {
         colors: {
           primary: 'blue',
-          neutral: 'zinc',
+          secondary: 'violet',
+          neutral: 'slate',
         },
       },
+      colorMode: true,
     }),
     tailwindcss(),
     vueDevTools(),
@@ -27,24 +29,15 @@ export default defineConfig({
       manifest: {
         name: 'Web Tools',
         short_name: 'Web Tools',
-        description: '本地优先、可离线回访的网页工具集。',
+        description: '本地优先、可离线回访的网页工具集',
         start_url: './',
         scope: './',
         display: 'standalone',
-        background_color: '#fef7ff',
-        theme_color: '#6750a4',
+        background_color: '#f2f2f7',
+        theme_color: '#007aff',
         icons: [
-          {
-            src: './icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any maskable',
-          },
-          {
-            src: './favicon.ico',
-            sizes: '48x48',
-            type: 'image/x-icon',
-          },
+          { src: './icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: './favicon.ico', sizes: '48x48', type: 'image/x-icon' },
         ],
       },
       workbox: {
@@ -59,10 +52,7 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: {
               cacheName: 'web-tools-static',
-              expiration: {
-                maxEntries: 80,
-                maxAgeSeconds: 60 * 60 * 24 * 30,
-              },
+              expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
           },
         ],

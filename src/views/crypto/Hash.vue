@@ -1,16 +1,17 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
-import { X } from '@lucide/vue'
 import { useToolState, useFileHandler, useDebouncedCompute } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import ToolLayout from '@/components/ToolLayout.vue'
+import ToolHeader from '@/components/ToolHeader.vue'
+import ToolCard from '@/components/ToolCard.vue'
 import FileDropZone from '@/components/FileDropZone.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import HashWorker from '@/workers/hash.worker?worker'
 import { createWorkerPool } from '@/workers/pool'
 
 const MAX_TEXT_HASH_CHARS = 400_000
-const MAX_FILE_HASH_BYTES = 2 * 1024 * 1024 * 1024 // 2GB
+const MAX_FILE_HASH_BYTES = 2 * 1024 * 1024 * 1024
 
 const { input, history, saveHistory, reset } = useToolState<string, { input: string }>({
   storageKey: 'hash',
@@ -120,26 +121,24 @@ const displayResults = computed(() => {
 
 <template>
   <ToolLayout max-width="3xl">
-    <UCard class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant">
-      <div class="mb-4 flex items-center justify-between">
-        <span class="text-sm font-medium text-on-surface-variant">输入内容</span>
-        <div class="flex items-center gap-2">
-          <HistoryPanel
-            :items="history.items.value"
-            @select="onHistorySelect"
-            @remove="history.remove"
-            @clear="history.clear"
-          />
-          <UButton
-            variant="ghost"
-            color="neutral"
-            @click="clearAll"
-            class="rounded-full px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-variant transition-colors"
-          >
-            清空
-          </UButton>
-        </div>
-      </div>
+    <ToolHeader title="哈希工具" description="文本与大文件 MD5 / SHA1 / SHA256 / SHA512 分块计算" icon="i-lucide-fingerprint" />
+
+    <ToolCard title="输入内容" description="输入文本或拖拽文件，文件会使用 Worker 分块计算。">
+      <template #actions>
+        <HistoryPanel
+          :items="history.items.value"
+          @select="onHistorySelect"
+          @remove="history.remove"
+          @clear="history.clear"
+        />
+        <UButton
+          label="清空"
+          color="neutral"
+          variant="ghost"
+          @click="clearAll"
+          class="rounded-full"
+        />
+      </template>
 
       <FileDropZone
         v-if="!fileHandler.file.value"
@@ -150,41 +149,40 @@ const displayResults = computed(() => {
 
       <div
         v-else
-        class="flex items-center justify-between rounded-xl bg-primary-container/30 px-4 py-3"
+        class="flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3"
       >
         <div class="min-w-0">
-          <div class="truncate text-sm font-medium text-on-surface">{{ fileHandler.file.value.name }}</div>
-          <div class="text-xs text-on-surface-variant">{{ fileHandler.formatSize(fileHandler.file.value.size) }}</div>
+          <div class="truncate text-sm font-medium">{{ fileHandler.file.value.name }}</div>
+          <div class="text-xs text-muted">{{ fileHandler.formatSize(fileHandler.file.value.size) }}</div>
         </div>
         <UButton
-          variant="ghost"
+          icon="i-lucide-x"
           color="neutral"
+          variant="ghost"
           @click="fileHandler.removeFile(); fileHashes = {}"
-          class="ml-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-surface-variant transition-colors"
-        >
-          <X class="h-4 w-4 text-on-surface-variant" />
-        </UButton>
+          class="rounded-full"
+        />
       </div>
 
-      <textarea
+      <UTextarea
         v-if="!fileHandler.file.value"
         v-model="input"
         @blur="saveHistory"
         placeholder="输入要计算哈希的内容..."
-        class="mt-4 h-40 w-full resize-none rounded-xl border border-outline bg-surface p-4 text-sm text-on-surface outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20"
+        :rows="8"
+        autoresize
+        :maxrows="12"
+        class="mt-4 w-full"
       />
-      <div v-if="textHashNotice" class="mt-2 text-xs text-on-surface-variant">
-        {{ textHashNotice }}
-      </div>
+      <UAlert v-if="textHashNotice" class="mt-3" color="warning" variant="soft" icon="i-lucide-triangle-alert" :description="textHashNotice" />
 
       <UProgress
         v-if="isComputing && fileHandler.file.value"
         v-model="hashProgress"
         :max="100"
-        color="primary"
         class="mt-3"
       />
-    </UCard>
+    </ToolCard>
 
     <div class="space-y-3">
       <ResultPanel
@@ -194,7 +192,7 @@ const displayResults = computed(() => {
         :value="item.value"
         :copyable="!!item.value && !item.value.startsWith('SM3') && !item.value.startsWith('错误')"
       >
-        <span v-if="isComputing && fileHandler.file.value" class="text-on-surface-variant">计算中 {{ hashProgress }}%</span>
+        <span v-if="isComputing && fileHandler.file.value" class="text-muted">计算中 {{ hashProgress }}%</span>
         <span v-else>{{ item.value || '等待输入...' }}</span>
       </ResultPanel>
     </div>

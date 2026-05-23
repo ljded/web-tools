@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { History, X, Trash2, Clock } from '@lucide/vue'
 
 interface HistoryItem {
   id: string
@@ -45,76 +44,81 @@ function onSelect(item: HistoryItem) {
 <template>
   <div class="relative">
     <UButton
-      variant="ghost"
       color="neutral"
+      variant="ghost"
+      size="sm"
       @click="open = !open"
-      class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-on-surface-variant hover:bg-surface-variant transition-colors"
-      :class="open ? 'bg-surface-variant' : ''"
+      class="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-muted hover:bg-elevated transition-colors"
+      :class="open ? 'bg-elevated' : ''"
     >
-      <History class="h-3.5 w-3.5" />
+      <UIcon name="i-lucide-history" class="size-3.5" />
       {{ t('app.history') }}
-      <UBadge v-if="items.length" color="primary" variant="soft" size="xs" class="text-[10px]">{{ items.length }}</UBadge>
+      <UBadge v-if="items.length" color="primary" variant="soft" size="xs">{{ items.length }}</UBadge>
     </UButton>
 
-    <div
+    <UCard
       v-if="open"
-      class="absolute right-0 top-full z-50 mt-1 w-72 rounded-xl border border-outline bg-surface shadow-lg"
+      variant="outline"
+      :ui="{ root: 'absolute right-0 top-full z-50 mt-1 w-72 rounded-xl shadow-lg', body: 'p-0' }"
     >
-      <div class="flex items-center justify-between border-b border-outline-variant px-3 py-2">
-        <span class="text-xs font-medium text-on-surface-variant">{{ displayTitle }}</span>
+      <div class="flex items-center justify-between border-b border-default px-3 py-2">
+        <span class="text-xs font-medium text-muted">{{ displayTitle }}</span>
         <div class="flex items-center gap-1">
           <UButton
             v-if="items.length"
-            variant="ghost"
             color="error"
+            variant="ghost"
             size="xs"
             @click="emit('clear')"
-            class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-error hover:bg-error-container/30 transition-colors"
+            class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-error hover:bg-error/5 transition-colors"
           >
-            <Trash2 class="h-3 w-3" />
+            <UIcon name="i-lucide-trash2" class="size-3" />
             {{ t('app.clear') }}
           </UButton>
           <UButton
-            variant="ghost"
             color="neutral"
+            variant="ghost"
             size="xs"
             @click="open = false"
-            class="rounded p-0.5 text-on-surface-variant hover:bg-surface-variant transition-colors"
+            class="rounded p-0.5 text-muted hover:bg-elevated transition-colors"
           >
-            <X class="h-3.5 w-3.5" />
+            <UIcon name="i-lucide-x" class="size-3.5" />
           </UButton>
         </div>
       </div>
 
-      <div v-if="!items.length" class="px-3 py-4 text-center text-xs text-on-surface-variant">
+      <div v-if="!items.length" class="px-3 py-4 text-center text-xs text-muted">
         {{ t('app.noHistory') }}
       </div>
 
       <div v-else class="max-h-64 overflow-auto py-1">
-        <button
+        <div
           v-for="item in items"
           :key="item.id"
-          @click="onSelect(item)"
-          class="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-surface-variant/50 transition-colors"
+          class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accented"
         >
-          <div class="min-w-0 flex-1">
-            <div class="truncate text-xs text-on-surface">{{ item.label }}</div>
-            <div class="mt-0.5 flex items-center gap-1 text-[10px] text-on-surface-variant">
-              <Clock class="h-2.5 w-2.5" />
+          <UButton
+            color="neutral"
+            variant="ghost"
+            class="min-w-0 flex-1 justify-start rounded-md p-0 text-left"
+            @click="onSelect(item)"
+          >
+            <div class="truncate text-xs text-default">{{ item.label }}</div>
+            <div class="mt-0.5 flex items-center gap-1 text-xs text-muted">
+              <UIcon name="i-lucide-clock" class="size-2.5" />
               {{ formatTime(item.timestamp) }}
             </div>
-          </div>
-          <UButton
-            variant="ghost"
-            color="neutral"
-            size="xs"
-            @click.stop="emit('remove', item.id)"
-            class="shrink-0 rounded p-1 text-on-surface-variant hover:text-error hover:bg-error-container/20 transition-colors"
-          >
-            <X class="h-3 w-3" />
           </UButton>
-        </button>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            size="xs"
+            icon="i-lucide-x"
+            @click="emit('remove', item.id)"
+            class="shrink-0 rounded p-1 text-muted hover:text-error hover:bg-error/10 transition-colors"
+          />
+        </div>
       </div>
-    </div>
+    </UCard>
   </div>
 </template>

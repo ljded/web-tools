@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Pipette, Palette } from '@lucide/vue'
 import { useToolState } from '@/composables'
 import ToolLayout from '@/components/ToolLayout.vue'
 import ToolHeader from '@/components/ToolHeader.vue'
@@ -68,87 +67,81 @@ const colorInputRef = ref<HTMLInputElement | null>(null)
 async function pickColor() {
   eyeDropperError.value = ''
   if ('EyeDropper' in window) {
-    try {
-      const result = await new (window as any).EyeDropper().open()
-      hex.value = result.sRGBHex; saveHistory()
-    } catch { /* 用户取消 */ }
-  } else {
-    colorInputRef.value?.click()
-  }
+    try { const result = await new (window as any).EyeDropper().open(); hex.value = result.sRGBHex; saveHistory() }
+    catch { /* 用户取消 */ }
+  } else { colorInputRef.value?.click() }
 }
 
 function onNativeColorChange(e: Event) {
   const target = e.target as HTMLInputElement
-  if (target.value) {
-    hex.value = target.value; saveHistory()
-  }
+  if (target.value) { hex.value = target.value; saveHistory() }
 }
 </script>
 
 <template>
   <ToolLayout max-width="4xl">
-    <ToolHeader title="颜色工具" description="Hex、RGB、HSL 颜色格式转换" :icon="Palette" />
+    <ToolHeader title="颜色工具" description="Hex、RGB、HSL 颜色格式转换" icon="i-lucide-palette" />
 
     <input ref="colorInputRef" type="color" class="sr-only" @change="onNativeColorChange" />
 
     <ToolCard>
       <div class="mb-6 flex items-center gap-4">
-        <div class="h-20 w-20 rounded-2xl shadow-sm outline outline-2 outline-outline" :style="colorPreviewBg" />
+        <div class="h-20 w-20 rounded-2xl shadow-sm outline outline-2 border-default" :style="colorPreviewBg" />
         <div class="flex-1">
-          <div class="text-lg font-medium text-on-surface">{{ hex.toUpperCase() }}</div>
-          <div class="mt-1 text-sm text-on-surface-variant">rgb({{ rgb.r }}, {{ rgb.g }}, {{ rgb.b }})</div>
+          <div class="text-lg font-medium text-highlighted">{{ hex.toUpperCase() }}</div>
+          <div class="mt-1 text-sm text-muted">rgb({{ rgb.r }}, {{ rgb.g }}, {{ rgb.b }})</div>
         </div>
-        <UButton variant="ghost" color="neutral" @click="pickColor" class="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-primary hover:bg-primary-container transition-colors">
-          <Pipette class="h-4 w-4" /> 屏幕取色
+        <UButton color="neutral" variant="ghost" @click="pickColor" class="rounded-full text-sm text-primary hover:bg-primary/10">
+          <template #leading><UIcon name="i-lucide-pipette" class="size-4" /></template>屏幕取色
         </UButton>
       </div>
-      <div v-if="eyeDropperError" class="px-6 pb-4 text-xs text-error">{{ eyeDropperError }}</div>
+      <UAlert v-if="eyeDropperError" color="error" variant="soft" icon="i-lucide-circle-alert" :description="eyeDropperError" />
     </ToolCard>
 
     <ToolCard>
       <div class="space-y-6">
         <div>
           <div class="mb-2 flex items-center justify-between">
-            <label class="text-xs font-medium uppercase tracking-wider text-on-surface-variant">HEX</label>
+            <label class="text-xs font-medium uppercase tracking-wider text-muted">HEX</label>
             <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
           </div>
           <div class="flex items-center gap-2">
-            <UInput v-model="hex" @blur="saveHistory" placeholder="#RRGGBB" class="h-11 w-full" />
+            <UInput v-model="hex" @blur="saveHistory" placeholder="#RRGGBB" class="w-full" />
             <CopyBtn :text="hex.toUpperCase()" />
           </div>
         </div>
 
         <div>
-          <label class="mb-2 block text-xs font-medium uppercase tracking-wider text-on-surface-variant">RGB</label>
+          <label class="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">RGB</label>
           <div class="flex items-center gap-3">
             <div v-for="key in ['r', 'g', 'b'] as const" :key="key" class="flex-1">
-              <UInput v-model.number="rgb[key]" type="number" :min="0" :max="255" @change="updateFromRgb" class="h-11 w-full" />
-              <div class="mt-1 text-center text-xs text-on-surface-variant uppercase">{{ key }}</div>
+              <UInput v-model.number="rgb[key]" type="number" :min="0" :max="255" @change="updateFromRgb" class="w-full" />
+              <div class="mt-1 text-center text-xs text-muted uppercase">{{ key }}</div>
             </div>
             <CopyBtn :text="`rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`" />
           </div>
         </div>
 
         <div>
-          <label class="mb-2 block text-xs font-medium uppercase tracking-wider text-on-surface-variant">HSL</label>
+          <label class="mb-2 block text-xs font-medium uppercase tracking-wider text-muted">HSL</label>
           <div class="flex items-center gap-3">
             <div v-for="item in [{ key: 'h' as const, label: 'H', max: 360 }, { key: 's' as const, label: 'S%', max: 100 }, { key: 'l' as const, label: 'L%', max: 100 }]" :key="item.key" class="flex-1">
-              <UInput v-model.number="hsl[item.key]" type="number" :min="0" :max="item.max" @change="updateFromHsl" class="h-11 w-full" />
-              <div class="mt-1 text-center text-xs text-on-surface-variant">{{ item.label }}</div>
+              <UInput v-model.number="hsl[item.key]" type="number" :min="0" :max="item.max" @change="updateFromHsl" class="w-full" />
+              <div class="mt-1 text-center text-xs text-muted">{{ item.label }}</div>
             </div>
             <CopyBtn :text="`hsl(${hsl.h}, ${hsl.s}%, ${hsl.l}%)`" />
           </div>
         </div>
 
         <div class="space-y-3">
-          <div class="text-xs font-medium uppercase tracking-wider text-on-surface-variant">其他格式</div>
+          <div class="text-xs font-medium uppercase tracking-wider text-muted">其他格式</div>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div class="flex items-center justify-between rounded-xl bg-surface-variant/50 px-4 py-3">
-              <code class="font-mono text-xs text-on-surface">rgb({{ rgb.r }} {{ rgb.g }} {{ rgb.b }})</code>
+            <div class="flex items-center justify-between rounded-xl bg-elevated px-4 py-3">
+              <code class="font-mono text-xs text-default">rgb({{ rgb.r }} {{ rgb.g }} {{ rgb.b }})</code>
               <CopyBtn :text="`rgb(${rgb.r} ${rgb.g} ${rgb.b})`" />
             </div>
-            <div class="flex items-center justify-between rounded-xl bg-surface-variant/50 px-4 py-3">
-              <code class="font-mono text-xs text-on-surface">hsl({{ hsl.h }} {{ hsl.s }}% {{ hsl.l }}%)</code>
+            <div class="flex items-center justify-between rounded-xl bg-elevated px-4 py-3">
+              <code class="font-mono text-xs text-default">hsl({{ hsl.h }} {{ hsl.s }}% {{ hsl.l }}%)</code>
               <CopyBtn :text="`hsl(${hsl.h} ${hsl.s}% ${hsl.l}%)`" />
             </div>
           </div>

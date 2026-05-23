@@ -1,13 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import {
-  AlignLeft,
-  Minimize2,
-  TreePine,
-  Search,
-  KeyRound,
-  Braces,
-} from '@lucide/vue'
 import { useToolState } from '@/composables'
 import ToolLayout from '@/components/ToolLayout.vue'
 import ToolHeader from '@/components/ToolHeader.vue'
@@ -35,6 +27,10 @@ const showTree = ref(true)
 const parsed = ref<unknown>(null)
 const status = ref('')
 const monacoRef = ref<InstanceType<typeof MonacoEditor> | null>(null)
+
+function toggleTree() {
+  showTree.value = !showTree.value
+}
 
 function formatJson() {
   const editor = monacoRef.value?.getEditor()
@@ -110,32 +106,35 @@ watch(input, validateJson, { immediate: true })
 
 <template>
   <ToolLayout max-width="6xl">
-    <ToolHeader title="JSON 编辑器" description="格式化、压缩、转义、JWT 解析与树形预览" :icon="Braces" />
+    <ToolHeader title="JSON 编辑器" description="格式化、压缩、转义、JWT 解析与树形预览" icon="i-lucide-braces" />
 
     <ToolCard :padding="false">
-      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant px-4 py-3">
-        <span class="text-sm font-medium text-on-surface-variant">JSON 编辑器</span>
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-default px-4 py-3">
+        <span class="text-sm font-medium text-muted">JSON 编辑器</span>
         <div class="flex flex-wrap items-center gap-2">
           <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
-          <UButton variant="ghost" color="neutral" @click="openFind" class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container transition-colors">
-            <Search class="h-3.5 w-3.5" /> 搜索
+          <UButton color="neutral" variant="ghost" @click="openFind" class="rounded-full text-xs text-primary hover:bg-primary/10">
+            <template #leading><UIcon name="i-lucide-search" class="size-3.5" /></template>搜索
           </UButton>
-          <UButton variant="ghost" color="neutral" @click="formatJson" class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container transition-colors">
-            <AlignLeft class="h-3.5 w-3.5" /> 格式化
+          <UButton color="neutral" variant="ghost" @click="formatJson" class="rounded-full text-xs text-primary hover:bg-primary/10">
+            <template #leading><UIcon name="i-lucide-align-left" class="size-3.5" /></template>格式化
           </UButton>
-          <UButton variant="ghost" color="neutral" @click="compressJson" class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container transition-colors">
-            <Minimize2 class="h-3.5 w-3.5" /> 压缩
+          <UButton color="neutral" variant="ghost" @click="compressJson" class="rounded-full text-xs text-primary hover:bg-primary/10">
+            <template #leading><UIcon name="i-lucide-minimize-2" class="size-3.5" /></template>压缩
           </UButton>
-          <UButton variant="ghost" color="neutral" @click="escapeJson" class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container transition-colors">
-            转义
-          </UButton>
-          <UButton variant="ghost" color="neutral" @click="parseJwt" class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container transition-colors">
-            <KeyRound class="h-3.5 w-3.5" /> 解析 JWT
+          <UButton color="neutral" variant="ghost" @click="escapeJson" class="rounded-full text-xs text-primary hover:bg-primary/10">转义</UButton>
+          <UButton color="neutral" variant="ghost" @click="parseJwt" class="rounded-full text-xs text-primary hover:bg-primary/10">
+            <template #leading><UIcon name="i-lucide-key-round" class="size-3.5" /></template>解析 JWT
           </UButton>
           <CopyBtn :text="input" variant="button" />
-          <UButton variant="ghost" color="neutral" @click="showTree = !showTree" class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container transition-colors" :class="showTree ? 'bg-primary-container' : ''">
-            <TreePine class="h-3.5 w-3.5" /> 树视图
-          </UButton>
+          <UButton
+            color="neutral" variant="ghost"
+            :label="showTree ? '隐藏树视图' : '显示树视图'"
+            :icon="showTree ? 'i-lucide-panel-right-close' : 'i-lucide-panel-right-open'"
+            @click="toggleTree"
+            class="rounded-full text-xs text-primary hover:bg-primary/10"
+            :class="showTree ? 'bg-primary/10' : ''"
+          />
         </div>
       </div>
 
@@ -143,20 +142,20 @@ watch(input, validateJson, { immediate: true })
         <div class="relative flex flex-1">
           <MonacoEditor ref="monacoRef" v-model="input" language="json" :options="{ wordWrap: 'on', find: { addExtraSpaceOnTop: true, autoFindInSelection: 'never' } }" @blur="saveHistory" />
         </div>
-        <div v-if="showTree" class="hidden w-80 overflow-auto border-l border-outline-variant bg-surface-variant/20 md:block">
-          <div class="sticky top-0 z-10 border-b border-outline-variant bg-surface-variant/40 px-3 py-2 text-xs font-medium text-on-surface-variant backdrop-blur">
-            结构预览
-          </div>
+        <div v-show="showTree" class="hidden w-80 overflow-auto border-l border-default bg-default/50 md:block">
+          <div class="sticky top-0 z-10 border-b border-default bg-elevated px-3 py-2 text-xs font-medium text-muted backdrop-blur">结构预览</div>
           <div class="p-2">
             <JsonTree v-if="parsed !== null" :data="parsed" />
-            <div v-else-if="input.trim()" class="px-2 py-4 text-xs text-error">{{ error || status || '无法解析为 JSON' }}</div>
-            <div v-else class="px-2 py-4 text-xs text-on-surface-variant">输入 JSON 以查看树形结构</div>
+            <UAlert v-else-if="input.trim()" class="m-2" :color="error ? 'error' : 'success'" variant="soft" :icon="error ? 'i-lucide-circle-alert' : 'i-lucide-circle-check'" :description="error || status || '无法解析为 JSON'" />
+            <div v-else class="px-2 py-4 text-xs text-muted">输入 JSON 以查看树形结构</div>
           </div>
         </div>
       </div>
 
-      <div v-if="error || status" class="border-t border-outline-variant px-4 py-2 text-xs" :class="error ? 'text-error' : 'text-on-surface-variant'">
-        {{ error || status }}
+      <div v-if="error || status" class="border-t border-default px-4 py-2">
+        <UBadge :color="error ? 'error' : 'success'" variant="soft" size="sm">
+          {{ error || status }}
+        </UBadge>
       </div>
     </ToolCard>
   </ToolLayout>

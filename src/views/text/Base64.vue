@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
-import { ArrowRightLeft, FileUp, X, Download } from '@lucide/vue'
 import { useToolState, useFileHandler } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import ToolLayout from '@/components/ToolLayout.vue'
-import CopyBtn from '@/components/CopyBtn.vue'
+import ToolHeader from '@/components/ToolHeader.vue'
+import ToolCard from '@/components/ToolCard.vue'
+import ResultPanel from '@/components/ResultPanel.vue'
 
 const MAX_TEXT_CONVERT_CHARS = 2_000_000
 const MAX_FILE_ENCODE_BYTES = 500 * 1024 * 1024
@@ -29,6 +30,7 @@ const { input, history, saveHistory } = useToolState<string, { mode: 'encode' | 
 const fileHandler = useFileHandler({ maxSize: MAX_FILE_ENCODE_BYTES })
 const fileBase64 = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
+const hasUploadedImageFile = computed(() => !!fileHandler.file.value && isImageFile(fileHandler.file.value))
 
 function onHistorySelect(item: { data: { mode: 'encode' | 'decode'; input: string } }) {
   mode.value = item.data.mode
@@ -122,13 +124,12 @@ watch([input, mode], debouncedCompute)
 
 const finalResult = computed(() => {
   if (fileHandler.file.value) {
-    if (addDataUri.value && !fileBase64.value.startsWith('data:')) {
-      const mime = isImageFile(fileHandler.file.value) ? fileHandler.file.value.type : 'application/octet-stream'
+    if (hasUploadedImageFile.value && addDataUri.value && !fileBase64.value.startsWith('data:')) {
+      const mime = fileHandler.file.value.type || 'image/png'
       return `data:${mime};base64,` + fileBase64.value
     }
     return fileBase64.value
   }
-  if (mode.value === 'encode' && addDataUri.value && result.value) return 'data:text/plain;base64,' + result.value
   return result.value
 })
 
@@ -164,13 +165,11 @@ async function downloadDecodedFile() {
   } catch { /* ignore */ }
 }
 
-function setMode(newMode: 'encode' | 'decode') {
-  if (mode.value === newMode) return
-  mode.value = newMode; fileHandler.removeFile(); fileBase64.value = ''; input.value = ''; result.value = ''; isLargeDecode.value = false; encodeError.value = ''; cleanupPreview()
+function switchMode() {
+  mode.value = mode.value === 'encode' ? 'decode' : 'encode'
+  fileHandler.removeFile(); fileBase64.value = ''; input.value = ''; result.value = ''; isLargeDecode.value = false; encodeError.value = ''; cleanupPreview()
 }
-function switchMode() { setMode(mode.value === 'encode' ? 'decode' : 'encode') }
 function handleFileUpload(e: Event) { const file = (e.target as HTMLInputElement).files?.[0]; if (file) setFile(file) }
-function handleFileDrop(e: DragEvent) { e.preventDefault(); if (mode.value !== 'encode') return; const file = e.dataTransfer?.files?.[0]; if (file) setFile(file) }
 function setFile(f: File) {
   encodeError.value = ''
   if (!fileHandler.setFile(f)) { encodeError.value = fileHandler.error.value; return }
@@ -179,7 +178,7 @@ function setFile(f: File) {
   reader.onload = () => { const res = reader.result; if (typeof res !== 'string') return; fileBase64.value = res.split(',')[1] || ''; if (mode.value === 'decode') result.value = fileBase64.value }
   reader.readAsDataURL(f)
 }
-function removeFile() { fileHandler.removeFile(); fileBase64.value = ''; input.value = ''; result.value = ''; encodeError.value = '' }
+function removeFile() { fileHandler.removeFile(); fileBase64.value = ''; input.value = ''; result.value = ''; encodeError.value = ''; addDataUri.value = false }
 function triggerFile() { if (fileInput.value) fileInput.value.value = ''; fileInput.value?.click() }
 function downloadImage() {
   const src = fileHandler.file.value ? uploadedImageSrc.value : imgPreview.value
@@ -191,63 +190,67 @@ onUnmounted(() => cleanupPreview())
 
 <template>
   <ToolLayout max-width="3xl">
-    <div class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant">
+    <ToolHeader title="Base64 工具" description="文本与文件 Base64 编码、解码和图片预览" icon="i-lucide-binary" />
+
+    <ToolCard title="输入" description="选择编码或解码模式，支持文本和文件输入。">
+      <template #actions>
+        <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
+      </template>
       <div class="mb-4 flex items-center gap-3 flex-wrap justify-between">
         <div class="flex items-center gap-3 flex-wrap">
-          <div class="inline-flex rounded-full bg-surface-variant p-1">
-            <UButton variant="ghost" color="neutral" @click="setMode('encode')" class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors" :class="mode === 'encode' ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant'">编码</UButton>
-            <UButton variant="ghost" color="neutral" @click="setMode('decode')" class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors" :class="mode === 'decode' ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant'">解码</UButton>
-          </div>
-          <UButton variant="ghost" color="neutral" @click="switchMode" class="flex h-9 w-9 items-center justify-center rounded-full hover:bg-surface-variant transition-colors" title="交换">
-            <ArrowRightLeft class="h-4 w-4 text-on-surface-variant" />
-          </UButton>
-          <UButton v-if="mode === 'encode'" variant="ghost" color="neutral" @click="triggerFile" class="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium text-primary hover:bg-primary-container transition-colors">
-            <FileUp class="h-4 w-4" /> 文件转 Base64
-          </UButton>
-          <input v-if="mode === 'encode'" ref="fileInput" type="file" class="hidden" @change="handleFileUpload" />
-        </div>
-        <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
-      </div>
-
-      <div v-if="encodeError" class="mb-3 text-sm text-error">{{ encodeError }}</div>
-
-      <div v-if="!fileHandler.file.value" @dragover.prevent @drop="handleFileDrop">
-        <UTextarea v-model="input" @blur="saveHistory" :placeholder="mode === 'encode' ? '输入要编码的文本，或拖拽文件到此处...' : '输入要解码的 Base64（支持大图片直接粘贴）'" :rows="10" class="resize-none rounded-xl border border-outline bg-surface p-4 text-sm w-full" :class="mode === 'encode' ? 'border-dashed hover:border-primary hover:bg-primary-container/20' : ''" />
-      </div>
-
-      <div v-else class="relative flex items-center gap-3 rounded-xl bg-primary-container/30 px-4 py-3">
-        <FileUp class="h-6 w-6 text-primary" />
-        <div class="min-w-0 flex-1">
-          <div class="truncate text-sm font-medium text-on-surface">{{ fileHandler.file.value.name }}</div>
-          <div class="text-xs text-on-surface-variant">{{ fileHandler.formatSize(fileHandler.file.value.size) }}</div>
-        </div>
-        <UButton variant="ghost" color="neutral" @click="removeFile" class="flex h-7 w-7 items-center justify-center rounded-full bg-surface shadow-sm hover:bg-surface-variant transition-colors">
-          <X class="h-3.5 w-3.5 text-on-surface-variant" />
-        </UButton>
-      </div>
-    </div>
-
-    <div class="rounded-2xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant">
-      <div class="mb-3 flex items-center justify-between">
-        <span class="text-sm font-medium text-on-surface-variant">结果</span>
-        <div class="flex items-center gap-3">
-          <UCheckbox v-if="fileHandler.file.value && isImageFile(fileHandler.file.value)" v-model="addDataUri" label="Data URI 前缀" />
-          <UButton v-if="showPreview || (fileHandler.file.value && isImageResult)" variant="ghost" color="neutral" @click="downloadImage" class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container transition-colors">
-            <Download class="h-3.5 w-3.5" /> 下载图片
-          </UButton>
-          <UButton v-if="isLargeDecode" variant="ghost" color="neutral" @click="downloadDecodedFile" class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary-container transition-colors">
-            <Download class="h-3.5 w-3.5" /> 下载文件
-          </UButton>
-          <CopyBtn v-if="finalResult && !(mode === 'decode' && isImageResult && !fileHandler.file.value) && !isLargeDecode" :text="finalResult" variant="button" />
+          <UTabs v-model="mode" :items="[{ label: '编码', value: 'encode' }, { label: '解码', value: 'decode' }]" color="success" />
+          <UButton color="neutral" variant="ghost" @click="switchMode" class="rounded-full" icon="i-lucide-arrow-right-left" title="交换" />
+          <UButton
+            v-if="mode === 'encode'"
+            color="neutral" variant="ghost"
+            @click="triggerFile"
+            class="rounded-full text-xs text-primary hover:bg-primary/10"
+            icon="i-lucide-file-up"
+          >文件转 Base64</UButton>
+          <input ref="fileInput" type="file" accept="*/*" class="hidden" @change="handleFileUpload" />
+          <UButton
+            v-if="mode === 'decode' && isImageResult"
+            color="neutral" variant="ghost"
+            @click="downloadDecodedFile"
+            class="rounded-full text-xs text-primary hover:bg-primary/10"
+            icon="i-lucide-download"
+          >下载文件</UButton>
+          <UCheckbox v-if="mode === 'encode' && hasUploadedImageFile" v-model="addDataUri" label="Data URI 前缀" color="success" />
         </div>
       </div>
-      <div v-if="!(mode === 'decode' && isImageResult && !fileHandler.file.value)" class="break-all rounded-xl bg-surface-variant/50 p-4 font-mono text-sm text-on-surface whitespace-pre-wrap">
-        {{ resultDisplay || '等待输入...' }}
+
+      <div v-if="fileHandler.file.value && mode === 'encode'" class="mb-4 flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3">
+        <div class="min-w-0">
+          <div class="truncate text-sm font-medium">{{ fileHandler.file.value.name }}</div>
+          <div class="text-xs text-muted">{{ fileHandler.formatSize(fileHandler.file.value.size) }}</div>
+        </div>
+        <UButton color="neutral" variant="ghost" icon="i-lucide-x" @click="removeFile" class="rounded-full" />
       </div>
-      <div v-if="(showPreview && mode === 'decode') || (fileHandler.file.value && isImageResult)" class="mt-4">
-        <div class="mb-2 text-xs font-medium text-on-surface-variant">图片预览</div>
-        <img :src="fileHandler.file.value ? uploadedImageSrc : imgPreview" class="max-h-64 rounded-xl object-contain" @error="onImgError" />
+
+      <UTextarea
+        v-if="!fileHandler.file.value"
+        v-model="input"
+        @blur="saveHistory"
+        :placeholder="mode === 'encode' ? '输入要编码的文本...' : '输入要解码的 Base64（支持大图片直接粘贴）'"
+        :rows="10"
+        class="w-full"
+      />
+
+      <UAlert v-if="encodeError" class="mt-3" color="error" variant="soft" icon="i-lucide-circle-alert" :description="encodeError" />
+
+      <div v-if="showPreview" class="mt-4 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-muted">图片预览</span>
+          <UButton color="neutral" variant="ghost" icon="i-lucide-download" @click="downloadImage" class="rounded-full text-xs">下载</UButton>
+        </div>
+        <div class="flex items-center justify-center rounded-xl bg-elevated p-4">
+          <img :src="imgPreview" class="max-h-64 max-w-full rounded-lg object-contain" @error="onImgError" />
+        </div>
       </div>
-    </div>
+    </ToolCard>
+
+    <ResultPanel v-if="finalResult" title="结果" :value="finalResult" pre-wrap>
+      {{ resultDisplay }}
+    </ResultPanel>
   </ToolLayout>
 </template>
