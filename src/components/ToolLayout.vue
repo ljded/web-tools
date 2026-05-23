@@ -1,5 +1,4 @@
 <script setup lang="ts">
-
 withDefaults(
   defineProps<{
     maxWidth?: '3xl' | '4xl' | '5xl' | '6xl' | 'full'
@@ -7,7 +6,7 @@ withDefaults(
   { maxWidth: '4xl' },
 )
 
-const widths = {
+const widths: Record<string, string> = {
   '3xl': 'max-w-3xl',
   '4xl': 'max-w-4xl',
   '5xl': 'max-w-5xl',
@@ -17,7 +16,7 @@ const widths = {
 </script>
 
 <template>
-  <UContainer class="mx-auto space-y-6" :class="widths[maxWidth]">
+  <UContainer :ui="{ base: `mx-auto space-y-6 pb-10 ${widths[maxWidth]}` }">
     <slot />
   </UContainer>
 </template>

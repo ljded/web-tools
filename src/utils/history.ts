@@ -35,17 +35,14 @@ function defaultEquals<T>(a: T, b: T): boolean {
   const tb = typeof b
   if (ta !== tb) return false
 
-  // 基本类型不同值
   if (ta === 'string' || ta === 'number' || ta === 'boolean') {
     return a === b
   }
 
-  // Date 比较
   if (a instanceof Date && b instanceof Date) {
     return a.getTime() === b.getTime()
   }
 
-  // 对象：浅比较第一层键值（避免对 File/Blob/ArrayBuffer 做 JSON.stringify）
   if (typeof a === 'object' && typeof b === 'object') {
     const keysA = Object.keys(a as object)
     const keysB = Object.keys(b as object)
@@ -69,9 +66,9 @@ export function useHistory<T extends Record<string, unknown>>(
 
   const items = shallowRef<HistoryItem<T>[]>([])
 
-  load()
+  let loaded = false
 
-  async function load() {
+  async function loadFromDB() {
     try {
       const records = await getHistoryRecords<T>(key)
       if (records.length) {
@@ -81,22 +78,38 @@ export function useHistory<T extends Record<string, unknown>>(
           data,
           label,
         }))
+        loaded = true
         return
       }
 
       const legacy = localStorage.getItem(key)
-      if (!legacy) return
-      const parsed = JSON.parse(legacy) as HistoryItem<T>[]
-      items.value = parsed
-      await save()
-      localStorage.removeItem(key)
-    } catch {
-      items.value = []
+      if (legacy) {
+        const parsed = JSON.parse(legacy) as HistoryItem<T>[]
+        items.value = parsed
+        await save()
+        localStorage.removeItem(key)
+      }
+    } catch (e) {
+      console.error('[web-tools] history load error', key, e)
+      if (!loaded) items.value = []
     }
+    loaded = true
+  }
+  loadFromDB()
+
+  function formatUUID(): string {
+    try {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID()
+      }
+    } catch { /* fall through */ }
+    return `${Date.now()}_${Math.random().toString(36).slice(2)}`
   }
 
   function save() {
-    return putHistoryRecords(key, items.value).catch(() => undefined)
+    return putHistoryRecords(key, items.value).catch((e) => {
+      console.error('[web-tools] history save error', key, e)
+    })
   }
 
   let addTimer: ReturnType<typeof setTimeout> | null = null
@@ -118,41 +131,42 @@ export function useHistory<T extends Record<string, unknown>>(
       : JSON.stringify(data).slice(0, 60)
 
     const cmp = equals ?? defaultEquals
-
-    const duplicateIndex = items.value.findIndex((item) => cmp(item.data, data))
+    const arr = [...items.value]
+    const duplicateIndex = arr.findIndex((item) => cmp(item.data, data))
+    const now = Date.now()
 
     if (duplicateIndex !== -1) {
-      const item = items.value[duplicateIndex]!
-      item.timestamp = Date.now()
-      item.label = label
-      items.value.splice(duplicateIndex, 1)
-      items.value.unshift(item)
+      const item = { ...arr[duplicateIndex]!, timestamp: now, label }
+      arr.splice(duplicateIndex, 1)
+      arr.unshift(item)
     } else {
-      items.value.unshift({
-        id:
-          typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `${Date.now()}_${Math.random()}`,
-        timestamp: Date.now(),
+      arr.unshift({
+        id: formatUUID(),
+        timestamp: now,
         data,
         label,
       })
-      if (items.value.length > maxCount) {
-        items.value = items.value.slice(0, maxCount)
+      if (arr.length > maxCount) {
+        arr.splice(maxCount)
       }
     }
 
+    items.value = arr
     save()
   }
 
   function remove(id: string) {
     items.value = items.value.filter((item) => item.id !== id)
-    deleteHistoryRecord(key, id).catch(() => undefined)
+    deleteHistoryRecord(key, id).catch((e) => {
+      console.error('[web-tools] history remove error', key, id, e)
+    })
   }
 
   function clear() {
     items.value = []
-    clearHistoryRecords(key).catch(() => undefined)
+    clearHistoryRecords(key).catch((e) => {
+      console.error('[web-tools] history clear error', key, e)
+    })
   }
 
   return {

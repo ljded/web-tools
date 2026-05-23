@@ -27,31 +27,34 @@ function select(value: string | number) {
 
 const colorMap = {
   primary: {
-    active: 'border-primary text-primary',
-    inactive: 'border-transparent text-on-surface-variant hover:text-on-surface',
+    active: 'border-primary text-(--ui-primary)',
+    inactive: 'border-transparent text-(--ui-text-dimmed) hover:text-(--ui-text)',
   },
   secondary: {
     active: 'border-secondary text-secondary',
-    inactive: 'border-transparent text-on-surface-variant hover:text-on-surface',
+    inactive: 'border-transparent text-(--ui-text-dimmed) hover:text-(--ui-text)',
   },
   tertiary: {
     active: 'border-tertiary text-tertiary',
-    inactive: 'border-transparent text-on-surface-variant hover:text-on-surface',
+    inactive: 'border-transparent text-(--ui-text-dimmed) hover:text-(--ui-text)',
   },
 }
 </script>
 
 <template>
-  <div class="flex border-b border-outline-variant">
-    <button
+  <div class="flex border-b border-default">
+    <UButton
       v-for="opt in options"
       :key="opt.value"
-      @click="select(opt.value)"
+      color="neutral"
+      variant="ghost"
+      size="sm"
       class="flex flex-1 items-center justify-center gap-2 border-b-2 py-3.5 text-sm font-medium transition-colors"
       :class="modelValue === opt.value ? colorMap[color].active : colorMap[color].inactive"
+      @click="select(opt.value)"
     >
       <component v-if="opt.icon" :is="opt.icon" class="h-4 w-4" />
       {{ opt.label }}
-    </button>
+    </UButton>
   </div>
 </template>

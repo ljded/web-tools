@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { FileUp } from '@lucide/vue'
 
 withDefaults(
   defineProps<{
@@ -20,46 +19,33 @@ withDefaults(
 )
 
 const emit = defineEmits<{ files: [files: File[]] }>()
-const inputRef = ref<HTMLInputElement | null>(null)
+const selectedFiles = ref<File | File[] | null>(null)
 
-function openPicker() {
-  if (!inputRef.value) return
-  inputRef.value.value = ''
-  inputRef.value.click()
-}
-
-function emitFiles(files: FileList | null | undefined) {
-  if (!files?.length) return
-  emit('files', Array.from(files))
-}
-
-function onDrop(event: DragEvent) {
-  event.preventDefault()
-  if (event.dataTransfer?.files) emitFiles(event.dataTransfer.files)
+function onUpdate(files: File | File[] | null | undefined) {
+  selectedFiles.value = files ?? null
+  if (!files) return
+  emit('files', Array.isArray(files) ? files : [files])
 }
 </script>
 
 <template>
-  <UButton
-    type="button"
-    variant="ghost"
-    color="neutral"
+  <UFileUpload
+    :model-value="selectedFiles"
+    :accept="accept"
+    :multiple="multiple"
     :disabled="disabled"
-    class="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-outline bg-surface/60 p-6 text-center transition-colors hover:border-primary hover:bg-primary-container/20 disabled:cursor-not-allowed disabled:opacity-60"
-    @dragover.prevent
-    @drop="onDrop"
-    @click="openPicker"
+    :label="title"
+    :description="hint || undefined"
+    icon="i-lucide-file-up"
+    variant="area"
+    size="lg"
+    :reset="true"
+    :preview="false"
+    :ui="{ base: 'rounded-2xl hover:border-primary hover:bg-primary/5', icon: 'text-primary' }"
+    @update:model-value="onUpdate"
   >
-    <slot name="icon"><FileUp class="mb-2 h-6 w-6 text-primary" /></slot>
-    <span class="text-sm font-medium text-on-surface">{{ title }}</span>
-    <span v-if="hint" class="mt-1 text-xs text-on-surface-variant">{{ hint }}</span>
-    <input
-      ref="inputRef"
-      type="file"
-      class="hidden"
-      :accept="accept"
-      :multiple="multiple"
-      @change="emitFiles(($event.target as HTMLInputElement).files)"
-    />
-  </UButton>
+    <template #leading>
+      <slot name="icon"><UIcon name="i-lucide-file-up" class="size-6 text-primary" /></slot>
+    </template>
+  </UFileUpload>
 </template>

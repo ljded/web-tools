@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { tools } from '@/tools/registry'
 
@@ -15,63 +15,96 @@ const toolCards = computed(() =>
   })),
 )
 
-function go(path: string) {
-  router.push(path)
+function go(path: string) { router.push(path) }
+
+function preloadTool(component: () => Promise<unknown>) {
+  try { component() } catch { /* silent */ }
 }
+function preloadAllTools() {
+  const schedule = typeof requestIdleCallback !== 'undefined'
+    ? (fn: () => void) => requestIdleCallback(fn, { timeout: 3000 })
+    : (fn: () => void) => setTimeout(fn, 200)
+  schedule(() => { for (const tool of tools) schedule(() => preloadTool(tool.component)) })
+}
+onMounted(preloadAllTools)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-8">
+    <!-- Hero -->
     <UCard
-      class="overflow-hidden rounded-3xl bg-gradient-to-br from-primary-container via-surface to-tertiary-container p-6 shadow-sm outline outline-1 outline-outline-variant md:p-8"
+      variant="subtle"
+      :ui="{ root: 'overflow-hidden rounded-3xl border-0 shadow-sm', body: 'p-6 md:p-10' }"
     >
       <div class="max-w-3xl">
-        <p class="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-primary">
+        <UBadge
+          color="primary"
+          variant="soft"
+          class="mb-4 rounded-full px-3 py-1 text-xs font-semibold tracking-wider uppercase"
+        >
           {{ t('app.tagline') }}
-        </p>
-        <h2 class="text-3xl font-semibold tracking-tight text-on-surface md:text-4xl">
+        </UBadge>
+        <h1 class="text-3xl font-bold tracking-tight text-highlighted md:text-4xl lg:text-5xl">
           {{ t('app.heroTitle') }}
-        </h2>
-        <p class="mt-3 max-w-2xl text-sm leading-6 text-on-surface-variant md:text-base">
+        </h1>
+        <p class="mt-4 max-w-2xl text-base leading-relaxed text-muted md:text-lg">
           {{ t('app.heroDesc') }}
         </p>
-        <div class="mt-5 flex flex-wrap gap-2 text-xs font-medium text-on-surface-variant">
-          <UBadge color="neutral" variant="soft" class="rounded-full bg-surface/80 px-3 py-1 shadow-sm">{{ t('app.badges.localProcessing') }}</UBadge>
-          <UBadge color="neutral" variant="soft" class="rounded-full bg-surface/80 px-3 py-1 shadow-sm">{{ t('app.badges.offline') }}</UBadge>
-          <UBadge color="neutral" variant="soft" class="rounded-full bg-surface/80 px-3 py-1 shadow-sm">{{ t('app.badges.noExternalDeps') }}</UBadge>
-          <UBadge color="neutral" variant="soft" class="rounded-full bg-surface/80 px-3 py-1 shadow-sm">{{ t('app.badges.mobileReady') }}</UBadge>
+        <div class="mt-6 flex flex-wrap gap-2">
+          <UBadge
+            v-for="b in ['localProcessing', 'offline', 'noExternalDeps', 'mobileReady']"
+            :key="b"
+            color="neutral"
+            variant="soft"
+            class="rounded-full px-3 py-1 text-xs font-medium"
+          >
+            {{ t(`app.badges.${b}`) }}
+          </UBadge>
         </div>
       </div>
     </UCard>
 
+    <!-- Section header -->
     <div class="flex items-end justify-between gap-4">
       <div>
-        <h2 class="text-2xl font-medium text-on-surface">{{ t('app.allTools') }}</h2>
-        <p class="mt-1 text-sm text-on-surface-variant">{{ t('app.chooseTool') }}</p>
+        <h2 class="text-2xl font-semibold text-highlighted">{{ t('app.allTools') }}</h2>
+        <p class="mt-1 text-sm text-muted">{{ t('app.chooseTool') }}</p>
       </div>
-      <UBadge color="neutral" variant="soft" class="hidden rounded-full bg-surface-variant px-3 py-1 text-xs font-medium text-on-surface-variant sm:inline-flex">
+      <UBadge
+        color="neutral"
+        variant="soft"
+        class="hidden rounded-full px-3 py-1 text-xs font-medium sm:inline-flex"
+      >
         {{ t('app.toolsCount', { count: toolCards.length }) }}
       </UBadge>
     </div>
 
+    <!-- Tool grid -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      <UButton
+      <UCard
         v-for="tool in toolCards"
         :key="tool.path"
-        variant="ghost"
-        color="neutral"
+        variant="outline"
+        :ui="{ root: 'cursor-pointer rounded-2xl transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md', body: 'p-5' }"
         @click="go(tool.path)"
-        class="group flex flex-col items-start rounded-2xl bg-surface p-5 text-left shadow-sm outline outline-1 outline-outline-variant transition-all hover:-translate-y-0.5 hover:shadow-md hover:outline-primary/50"
       >
         <div
-          class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl transition-transform group-hover:scale-105"
-          :class="tool.color"
+          class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-110"
+          :class="{
+            'bg-primary/10 text-primary': tool.color === 'primary',
+            'bg-secondary/10 text-secondary': tool.color === 'secondary',
+            'bg-success/10 text-success': tool.color === 'success',
+            'bg-info/10 text-info': tool.color === 'info',
+            'bg-warning/10 text-warning': tool.color === 'warning',
+            'bg-error/10 text-error': tool.color === 'error',
+            'bg-neutral/10 text-muted': tool.color === 'neutral',
+          }"
         >
-          <component :is="tool.icon" class="h-6 w-6" />
+          <UIcon :name="tool.icon" class="size-6" />
         </div>
-        <h3 class="text-lg font-medium text-on-surface">{{ tool.label }}</h3>
-        <p class="mt-1 text-sm text-on-surface-variant">{{ tool.desc }}</p>
-      </UButton>
+        <h3 class="text-base font-semibold text-highlighted">{{ tool.label }}</h3>
+        <p class="mt-1 text-sm text-muted">{{ tool.desc }}</p>
+      </UCard>
     </div>
   </div>
 </template>

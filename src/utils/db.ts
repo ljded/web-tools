@@ -14,6 +14,8 @@ export interface HistoryRecord<T = unknown> {
 let dbPromise: Promise<IDBDatabase> | null = null
 
 function openDatabase(): Promise<IDBDatabase> {
+  try { if (!indexedDB) throw new Error('IndexedDB not available') }
+  catch { return Promise.reject(new Error('IndexedDB not available')) }
   if (dbPromise) return dbPromise
 
   dbPromise = new Promise((resolve, reject) => {
@@ -30,6 +32,7 @@ function openDatabase(): Promise<IDBDatabase> {
 
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
+    request.onblocked = () => console.warn('[web-tools] IndexedDB upgrade blocked – close other tabs')
   })
 
   return dbPromise
@@ -71,6 +74,7 @@ export function putHistoryRecords<T>(storageKey: string, records: Omit<HistoryRe
           store.put({ ...record, storageKey, compoundId: `${storageKey}:${record.id}` })
         }
         tx.oncomplete = () => resolve()
+        tx.onabort = () => reject(new Error('Transaction aborted'))
         tx.onerror = () => reject(tx.error)
       }),
   )
@@ -78,6 +82,7 @@ export function putHistoryRecords<T>(storageKey: string, records: Omit<HistoryRe
 
 export function deleteHistoryRecord(storageKey: string, id: string) {
   return transact('readwrite', (store) => store.delete(`${storageKey}:${id}`)).then(() => undefined)
+    .catch((e) => { console.error('[web-tools] deleteHistoryRecord error', e) })
 }
 
 export async function clearHistoryRecords(storageKey: string) {
@@ -88,6 +93,7 @@ export async function clearHistoryRecords(storageKey: string) {
     const store = tx.objectStore(HISTORY_STORE)
     for (const record of records) store.delete(record.compoundId)
     tx.oncomplete = () => resolve()
+    tx.onabort = () => reject(new Error('Transaction aborted'))
     tx.onerror = () => reject(tx.error)
   })
 }

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Lightbulb } from '@lucide/vue'
 import { useToolState } from '@/composables'
 import ToolLayout from '@/components/ToolLayout.vue'
+import ToolHeader from '@/components/ToolHeader.vue'
+import ToolCard from '@/components/ToolCard.vue'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import CopyBtn from '@/components/CopyBtn.vue'
+import ResultPanel from '@/components/ResultPanel.vue'
 
 interface MatchItem {
   text: string
@@ -99,7 +101,6 @@ function updateRegexResult() {
     return
   }
 
-  // match mode
   const re = regex.value
   const results: MatchItem[] = []
   let m: RegExpExecArray | null
@@ -113,13 +114,12 @@ function updateRegexResult() {
   }
   matches.value = results
 
-  // highlight
   if (results.length) {
     let html = ''
     let lastIdx = 0
     for (const r of results) {
       html += escapeHtml(text.value.slice(lastIdx, r.index))
-      html += `<mark class="bg-yellow-200 dark:bg-yellow-800 rounded">${escapeHtml(r.text)}</mark>`
+      html += `<mark class="rounded bg-warning/20 text-highlighted">${escapeHtml(r.text)}</mark>`
       lastIdx = r.index + r.text.length
     }
     html += escapeHtml(text.value.slice(lastIdx))
@@ -134,15 +134,6 @@ watch([pattern, flagStr, text, replaceWith, activeTab], () => {
   if (computeTimer) clearTimeout(computeTimer)
   computeTimer = setTimeout(updateRegexResult, 200)
 }, { immediate: true })
-
-const highlightedPattern = computed(() => {
-  try {
-    new RegExp(pattern.value)
-    return escapeHtml(pattern.value)
-  } catch {
-    return `<span class="text-error">${escapeHtml(pattern.value)}</span>`
-  }
-})
 
 const presets = [
   { label: '邮箱', value: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}' },
@@ -162,17 +153,27 @@ function setPreset(value: string) {
 
 <template>
   <ToolLayout max-width="4xl">
-    <UCard class="rounded-3xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant">
+    <ToolHeader title="正则工具" description="正则匹配、替换、分割和结果高亮" icon="i-lucide-search-code" />
+
+    <ToolCard title="表达式与文本" description="选择预设或输入正则表达式，支持 flags 和历史记录。">
+      <template #actions>
+        <HistoryPanel
+          :items="history.items.value"
+          @select="onHistorySelect"
+          @remove="history.remove"
+          @clear="history.clear"
+        />
+      </template>
       <div class="space-y-4">
         <!-- 预设区域 -->
         <div class="flex flex-wrap items-center gap-2">
-          <span class="text-xs font-medium text-on-surface-variant">预设:</span>
+          <span class="text-xs font-medium text-muted">预设:</span>
           <UBadge
             v-for="p in presets"
             :key="p.label"
             color="neutral"
             variant="subtle"
-            class="cursor-pointer rounded-full px-3 py-1 text-xs transition-colors hover:bg-primary-container"
+            class="cursor-pointer rounded-full px-3 py-1 text-xs transition-colors hover:bg-primary/10"
             @click="setPreset(p.value)"
           >
             {{ p.label }}
@@ -181,14 +182,9 @@ function setPreset(value: string) {
 
         <!-- 正则输入 -->
         <div class="flex flex-wrap items-center gap-3">
-          <span class="font-mono text-on-surface">/</span>
-          <UInput
-            v-model="pattern"
-            @blur="doSaveHistory"
-            placeholder="正则表达式"
-            class="h-10 flex-1 font-mono"
-          />
-          <span class="font-mono text-on-surface">/</span>
+          <span class="font-mono text-default">/</span>
+          <UInput v-model="pattern" @blur="doSaveHistory" placeholder="正则表达式" class="flex-1 font-mono" />
+          <span class="font-mono text-default">/</span>
           <div class="flex gap-2">
             <UCheckbox
               v-for="(_, key) in flags"
@@ -198,83 +194,53 @@ function setPreset(value: string) {
             />
           </div>
         </div>
-        <div v-if="pattern" class="rounded bg-surface-variant/50 px-3 py-1.5">
-          <span class="mr-2 text-xs text-on-surface-variant">语法预览:</span>
-          <code class="font-mono text-xs" v-html="highlightedPattern" />
-        </div>
-        <div v-if="error" class="text-xs text-error">{{ error }}</div>
 
-        <!-- 标签切换 -->
-        <div class="flex items-center justify-between border-b border-outline-variant pb-2">
-          <div class="flex gap-2">
-            <UButton
-              v-for="t in ['match', 'replace', 'split'] as const"
-              :key="t"
-              variant="ghost"
-              color="neutral"
-              @click="activeTab = t"
-              class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
-              :class="activeTab === t ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant hover:bg-surface-variant'"
-            >
-              {{ t === 'match' ? '匹配' : t === 'replace' ? '替换' : '分割' }}
-            </UButton>
-          </div>
-          <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
-        </div>
+        <UAlert v-if="error" color="error" variant="soft" icon="i-lucide-circle-alert" :description="`错误: ${error}`" />
 
-        <!-- 文本输入 -->
-        <UTextarea
-          v-model="text"
-          @blur="doSaveHistory"
-          placeholder="输入测试文本..."
-          :rows="10"
-          class="resize-none rounded-xl border border-outline bg-surface p-3 text-sm w-full"
+        <!-- 操作标签页 -->
+        <UTabs
+          v-model="activeTab"
+          :items="[
+            { label: '匹配', value: 'match', icon: 'i-lucide-search' },
+            { label: '替换', value: 'replace', icon: 'i-lucide-replace' },
+            { label: '分割', value: 'split', icon: 'i-lucide-scissors' }
+          ]"
+          color="warning"
         />
 
-        <!-- 替换模式额外输入 -->
-        <div v-if="activeTab === 'replace'" class="space-y-2">
-          <div class="flex items-center gap-2">
-            <span class="text-sm text-on-surface-variant">替换为:</span>
-            <UInput v-model="replaceWith" placeholder="替换内容" class="h-10 flex-1 font-mono" />
-          </div>
-          <div class="flex items-center gap-1 text-xs text-on-surface-variant">
-            <Lightbulb class="h-3 w-3" />
-            支持 <code class="rounded bg-surface-variant px-1">$&amp;</code> 匹配项, <code class="rounded bg-surface-variant px-1">$1</code> <code class="rounded bg-surface-variant px-1">$2</code> 捕获组, <code class="rounded bg-surface-variant px-1">$`</code> 匹配前, <code class="rounded bg-surface-variant px-1">$'</code> 匹配后
-          </div>
-        </div>
-
-        <!-- 结果 -->
-        <div v-if="resultNotice" class="text-xs text-on-surface-variant">{{ resultNotice }}</div>
-
-        <div v-if="activeTab === 'match' && text">
-          <pre class="whitespace-pre-wrap text-sm text-on-surface" v-html="highlightedResult" />
-          <div v-if="matches.length" class="mt-4 space-y-2">
-            <div v-for="(m, i) in matches" :key="i" class="rounded-xl bg-surface-variant/50 p-3 text-sm">
-              <div class="flex items-center justify-between">
-                <span class="font-medium text-on-surface">匹配 #{{ i + 1 }}</span>
-                <span class="text-xs text-on-surface-variant">位置 {{ m.index }}</span>
-              </div>
-              <code class="mt-1 block font-mono text-primary">{{ m.text }}</code>
-              <div v-if="m.groups.filter(Boolean).length" class="mt-2 space-y-1">
-                <div v-for="(g, gi) in m.groups" :key="gi">
-                  <span v-if="g !== undefined" class="text-xs text-on-surface-variant">\${{ gi + 1 }}: <code class="rounded bg-surface px-1 font-mono text-xs">{{ g }}</code></span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="activeTab === 'replace'">
-          <pre class="whitespace-pre-wrap text-sm text-on-surface">{{ replaceResult }}</pre>
-          <CopyBtn v-if="replaceResult" :text="replaceResult" variant="button" class="mt-2" />
-        </div>
-
-        <div v-if="activeTab === 'split' && splitResult.length" class="space-y-2">
-          <div v-for="(s, i) in splitResult" :key="i" class="rounded-xl bg-surface-variant/50 p-3 font-mono text-sm text-on-surface">
-            [{{ i }}] {{ s }}
-          </div>
-        </div>
+        <UTextarea
+          v-model="text"
+          placeholder="输入要匹配的文本..."
+          :rows="8"
+          class="w-full"
+        />
       </div>
-    </UCard>
+
+      <!-- 替换输入框 -->
+      <UFormField v-if="activeTab === 'replace'" label="替换为" class="mt-3">
+        <UInput v-model="replaceWith" placeholder="替换内容..." class="w-full font-mono" />
+      </UFormField>
+    </ToolCard>
+
+    <!-- 结果区域 -->
+    <ResultPanel v-if="activeTab === 'match'" :title="`高亮结果 (${matches.length} 项匹配)`" :value="matches.map(m => m.text).join('\n')" :copyable="false" :monospace="false" pre-wrap>
+      <div class="break-all rounded-xl bg-elevated p-4 text-sm whitespace-pre-wrap" v-html="highlightedResult || '等待输入...'" />
+      <template #actions>
+        <CopyBtn :text="matches.map(m => m.text).join('\n')" variant="button" />
+      </template>
+      <UAlert v-if="resultNotice" class="mt-3" color="neutral" variant="soft" icon="i-lucide-info" :description="resultNotice" />
+    </ResultPanel>
+
+    <ResultPanel v-if="activeTab === 'replace'" title="替换结果" :value="replaceResult" pre-wrap />
+
+    <ResultPanel v-if="activeTab === 'split'" :title="`分割结果 (${splitResult.length} 项)`" :value="splitResult.join('\n---\n')" :copyable="false" :monospace="false">
+      <template #actions>
+        <CopyBtn :text="splitResult.join('\n---\n')" variant="button" />
+      </template>
+      <UAlert v-if="resultNotice" class="mb-3" color="neutral" variant="soft" icon="i-lucide-info" :description="resultNotice" />
+      <div class="space-y-2">
+        <div v-for="(s, i) in splitResult" :key="i" class="rounded-xl bg-elevated p-3 font-mono text-sm text-default">{{ s || '(空)' }}</div>
+      </div>
+    </ResultPanel>
   </ToolLayout>
 </template>

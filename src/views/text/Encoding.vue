@@ -3,7 +3,9 @@ import { ref, watch } from 'vue'
 import { useToolState } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import ToolLayout from '@/components/ToolLayout.vue'
-import CopyBtn from '@/components/CopyBtn.vue'
+import ToolHeader from '@/components/ToolHeader.vue'
+import ToolCard from '@/components/ToolCard.vue'
+import ResultPanel from '@/components/ResultPanel.vue'
 import gbk from 'gbk.js'
 
 const MAX_ENCODING_CHARS = 500_000
@@ -34,7 +36,6 @@ function updateResults() {
     notice.value = `输入过长，已暂停实时编码转换。请控制在 ${MAX_ENCODING_CHARS.toLocaleString()} 字符以内。`
     return
   }
-
   notice.value = ''
 
   if (mode.value === 'to') {
@@ -103,40 +104,29 @@ function getUtf16Hex(txt: string): string {
 
 <template>
   <ToolLayout max-width="3xl">
-    <UCard class="rounded-3xl bg-surface p-6 shadow-sm outline outline-1 outline-outline-variant">
+    <ToolHeader title="编码转换" description="字符编码、URL、HTML Entity、Base64 与 GBK 转换" icon="i-lucide-languages" />
+
+    <ToolCard title="输入" description="选择转换方向后输入文本或编码内容。">
+      <template #actions>
+        <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
+      </template>
       <div class="mb-4 flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <div class="inline-flex rounded-full bg-surface-variant p-1">
-            <UButton variant="ghost" color="neutral" @click="mode = 'to'" class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors" :class="mode === 'to' ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant'">
-              字符 → 编码
-            </UButton>
-            <UButton variant="ghost" color="neutral" @click="mode = 'from'" class="rounded-full px-4 py-1.5 text-sm font-medium transition-colors" :class="mode === 'from' ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant'">
-              编码 → 字符
-            </UButton>
-          </div>
+          <UTabs v-model="mode" :items="[{ label: '字符 → 编码', value: 'to' }, { label: '编码 → 字符', value: 'from' }]" color="info" />
         </div>
-        <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
       </div>
       <UTextarea
         v-model="input"
         @blur="saveHistory"
         :placeholder="mode === 'to' ? '输入要编码的文本...' : '输入编码内容（如 Base64、Hex、URL Encode 等）'"
         :rows="8"
-        class="resize-none rounded-xl border border-outline bg-surface p-4 text-sm w-full"
+        class="w-full"
       />
-      <div v-if="notice" class="mt-2 text-xs text-on-surface-variant">{{ notice }}</div>
-    </UCard>
+      <UAlert v-if="notice" class="mt-3" color="warning" variant="soft" icon="i-lucide-triangle-alert" :description="notice" />
+    </ToolCard>
 
     <div class="space-y-3">
-      <UCard v-for="item in results" :key="item.name" class="rounded-2xl bg-surface p-4 shadow-sm outline outline-1 outline-outline-variant">
-        <div class="mb-2 flex items-center justify-between">
-          <span class="text-sm font-medium text-on-surface-variant">{{ item.name }}</span>
-          <CopyBtn :text="item.value" variant="button" />
-        </div>
-        <div class="break-all rounded-xl bg-surface-variant/50 p-3 font-mono text-sm text-on-surface">
-          {{ item.value }}
-        </div>
-      </UCard>
+      <ResultPanel v-for="item in results" :key="item.name" :title="item.name" :value="item.value" />
     </div>
   </ToolLayout>
 </template>
