@@ -3,10 +3,9 @@ import { ref, watch, computed } from 'vue'
 import { usePersistedRef } from '@/utils/persist'
 import { useHistory } from '@/utils/history'
 import HistoryPanel from '@/components/HistoryPanel.vue'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 import RsaWorker from '@/workers/rsa.worker?worker'
 import CryptoWorker from '@/workers/crypto.worker?worker'
 import { createWorkerPool } from '@/workers/pool'
@@ -53,7 +52,7 @@ function onSm2HistorySelect(item: { data: { text: string; mode: string } }) { sm
 
 async function genSm2Keys() {
   const lease = await cryptoWorkerPool.acquire()
-  try { const keys = await lease.send<{ pub: string; pri: string }>({ type: 'sm2-keygen' }); sm2PubKey.value = keys.pub; sm2PriKey.value = keys.pri }
+  try { const keys = await lease.send<{ publicKey: string; privateKey: string }>({ type: 'sm2-gen-keys' }); sm2PubKey.value = keys.publicKey; sm2PriKey.value = keys.privateKey }
   catch (e: any) { sm2Error.value = e?.message || '生成失败' }
   finally { lease.release() }
 }
@@ -82,7 +81,7 @@ function onRsaHistorySelect(item: { data: { text: string; mode: string } }) { rs
 
 async function genRsaKeys() {
   const lease = await rsaWorkerPool.acquire()
-  try { const keys = await lease.send<{ pub: string; pri: string }>({ type: 'keygen' }); rsaPubKey.value = keys.pub; rsaPriKey.value = keys.pri }
+  try { const keys = await lease.send<{ publicKey: string; privateKey: string }>({ type: 'generate' }); rsaPubKey.value = keys.publicKey; rsaPriKey.value = keys.privateKey }
   catch (e: any) { rsaError.value = e?.message || '生成失败' }
   finally { lease.release() }
 }
@@ -134,7 +133,7 @@ async function computeBcrypt() {
   if (!bcryptText.value) { bcryptHash.value = ''; bcryptError.value = ''; return }
   bcryptLoading.value = true; bcryptError.value = ''
   const lease = await cryptoWorkerPool.acquire()
-  try { bcryptHash.value = await lease.send<string>({ type: 'bcrypt', text: bcryptText.value }) }
+  try { bcryptHash.value = await lease.send<string>({ type: 'bcrypt-hash', text: bcryptText.value }) }
   catch (e: any) { bcryptError.value = e?.message || '计算失败'; bcryptHash.value = '' }
   finally { bcryptLoading.value = false; lease.release() }
 }
@@ -182,7 +181,7 @@ const tabsConfig = [
 </script>
 
 <template>
-  <ToolLayout max-width="4xl">
+  <ToolPage name="crypto" max-width="4xl">
     <!-- 顶层 Tab 切换 -->
     <UTabs
       v-model="tab"
@@ -195,12 +194,10 @@ const tabsConfig = [
 
     <!-- AES -->
     <div v-if="tab === 'aes'" class="space-y-5">
-      <ToolHeader title="AES 加解密" description="高级加密标准，对称加密算法" icon="i-lucide-lock">
+      <ToolSection title="AES 加解密" description="高级加密标准，对称加密算法">
         <template #actions>
           <HistoryPanel :items="aesHistory.items.value" @select="onAesHistorySelect" @remove="aesHistory.remove" @clear="aesHistory.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <UTabs
           v-model="aesMode"
           :items="[{ label: '加密', value: 'encrypt', icon: 'i-lucide-lock' }, { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' }]"
@@ -222,17 +219,15 @@ const tabsConfig = [
           <UAlert v-if="aesError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="aesError" />
           <ResultPanel v-if="aesResult" title="结果" :value="aesResult" color="primary" />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- SM4 -->
     <div v-if="tab === 'sm4'" class="space-y-5">
-      <ToolHeader title="SM4 国密对称加密" description="国产分组密码算法" icon="i-lucide-file-key">
+      <ToolSection title="SM4 国密对称加密" description="国产分组密码算法">
         <template #actions>
           <HistoryPanel :items="sm4History.items.value" @select="onSm4HistorySelect" @remove="sm4History.remove" @clear="sm4History.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <UTabs
           v-model="sm4Mode"
           :items="[{ label: '加密', value: 'encrypt', icon: 'i-lucide-lock' }, { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' }]"
@@ -248,17 +243,15 @@ const tabsConfig = [
           <UAlert v-if="sm4Error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="sm4Error" />
           <ResultPanel v-if="sm4Result" title="结果" :value="sm4Result" color="secondary" />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- RSA -->
     <div v-if="tab === 'rsa'" class="space-y-5">
-      <ToolHeader title="RSA 加解密" description="非对称加密算法，支持 2048 位密钥" icon="i-lucide-key-round">
+      <ToolSection title="RSA 加解密" description="非对称加密算法，支持 2048 位密钥">
         <template #actions>
           <HistoryPanel :items="rsaHistory.items.value" @select="onRsaHistorySelect" @remove="rsaHistory.remove" @clear="rsaHistory.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <UTabs
           v-model="rsaMode"
           :items="[{ label: '加密', value: 'encrypt', icon: 'i-lucide-lock' }, { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' }]"
@@ -283,17 +276,15 @@ const tabsConfig = [
           <UAlert v-if="rsaError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="rsaError" />
           <ResultPanel v-if="rsaResult" title="结果" :value="rsaResult" color="primary" />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- SM2 -->
     <div v-if="tab === 'sm2'" class="space-y-5">
-      <ToolHeader title="SM2 国密非对称" description="国产椭圆曲线密码算法" icon="i-lucide-shield-check">
+      <ToolSection title="SM2 国密非对称" description="国产椭圆曲线密码算法">
         <template #actions>
           <HistoryPanel :items="sm2History.items.value" @select="onSm2HistorySelect" @remove="sm2History.remove" @clear="sm2History.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <div class="flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3">
           <span class="text-sm text-primary"><UIcon name="i-lucide-key-round" class="inline size-4" /> 密钥对</span>
           <UButton color="primary" size="sm" icon="i-lucide-refresh-cw" @click="genSm2Keys" class="rounded-lg px-3 py-2 text-xs font-medium">生成密钥对</UButton>
@@ -323,17 +314,15 @@ const tabsConfig = [
           <UAlert v-if="sm2Error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="sm2Error" />
           <ResultPanel v-if="sm2Result" title="结果" :value="sm2Result" color="primary" :copyable="!sm2Result.startsWith('✅') && !sm2Result.startsWith('❌')" />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- JWT -->
     <div v-if="tab === 'jwt'" class="space-y-5">
-      <ToolHeader title="JWT 编解码" description="JSON Web Token 签名与验证" icon="i-lucide-scan-line">
+      <ToolSection title="JWT 编解码" description="JSON Web Token 签名与验证">
         <template #actions>
           <HistoryPanel :items="jwtHistory.items.value" @select="onJwtHistorySelect" @remove="jwtHistory.remove" @clear="jwtHistory.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <UTabs
           v-model="jwtMode"
           :items="[{ label: '编码', value: 'encode', icon: 'i-lucide-lock' }, { label: '解码', value: 'decode', icon: 'i-lucide-unlock' }]"
@@ -349,13 +338,12 @@ const tabsConfig = [
           <UAlert v-if="jwtError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="jwtError" />
           <ResultPanel v-if="jwtResult" title="结果" :value="jwtResult" color="primary" pre-wrap />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- Bcrypt -->
     <div v-if="tab === 'bcrypt'" class="space-y-5">
-      <ToolHeader title="Bcrypt 哈希" description="密码哈希与验证" icon="i-lucide-fingerprint" />
-      <ToolCard>
+      <ToolSection title="Bcrypt 哈希" description="密码哈希与验证">
         <div class="space-y-5 p-6">
           <UFormField label="密码">
             <UInput v-model="bcryptText" placeholder="输入密码..." class="w-full" />
@@ -376,7 +364,7 @@ const tabsConfig = [
             <UAlert v-else-if="bcryptResult" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="bcryptResult" />
           </div>
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
-  </ToolLayout>
+  </ToolPage>
 </template>

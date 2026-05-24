@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import dayjs from 'dayjs'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
 import HistoryPanel from '@/components/HistoryPanel.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 import { useToolState } from '@/composables'
 import { usePersistedRef } from '@/utils/persist'
 
@@ -82,18 +81,16 @@ const diffResult = computed(() => {
 </script>
 
 <template>
-  <ToolLayout max-width="4xl">
-    <ToolHeader title="时间戳工具" description="实时时间戳、日期转换、时区计算与日期差值" icon="i-lucide-clock" />
-
-    <ToolCard title="实时时间戳">
+  <ToolPage name="timestamp" max-width="4xl">
+    <ToolSection title="实时时间戳">
       <ResultPanel title="本地时间" :value="nowDate" color="primary" :monospace="false" compact />
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <ResultPanel title="秒 (s)" :value="String(nowTs)" compact />
         <ResultPanel title="毫秒 (ms)" :value="String(nowMs)" compact />
       </div>
-    </ToolCard>
+    </ToolSection>
 
-    <ToolCard title="日期转时间戳">
+    <ToolSection title="日期转时间戳">
       <div class="flex items-center justify-between mb-3">
         <span class="text-xs font-medium text-muted">输入日期</span>
         <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
@@ -103,17 +100,17 @@ const diffResult = computed(() => {
         <ResultPanel title="秒" :value="String(dateTs.s)" compact />
         <ResultPanel title="毫秒" :value="String(dateTs.ms)" compact />
       </div>
-    </ToolCard>
+    </ToolSection>
 
-    <ToolCard title="时间戳转日期">
+    <ToolSection title="时间戳转日期">
       <div class="flex flex-wrap items-center gap-3">
         <UInput v-model="tsInput" placeholder="输入时间戳" class="flex-1" />
         <USelect v-model="tsUnit" :items="[{ label: '秒', value: 's' }, { label: '毫秒', value: 'ms' }]" />
       </div>
       <ResultPanel v-if="tsDate" class="mt-4" title="日期时间" :value="tsDate" compact />
-    </ToolCard>
+    </ToolSection>
 
-    <ToolCard title="时区计算">
+    <ToolSection title="时区计算">
       <div class="flex flex-wrap items-center gap-3">
         <UInput v-model="tzDate" placeholder="YYYY-MM-DD HH:mm:ss" class="flex-1" />
         <USelect v-model="tzFrom" :items="timezones.map(tz => ({ label: `${tz.label} (${tz.value})`, value: tz.value }))" />
@@ -121,9 +118,9 @@ const diffResult = computed(() => {
         <USelect v-model="tzTo" :items="timezones.map(tz => ({ label: `${tz.label} (${tz.value})`, value: tz.value }))" />
       </div>
       <ResultPanel v-if="tzResult" class="mt-4" title="转换后" :value="tzResult" compact />
-    </ToolCard>
+    </ToolSection>
 
-    <ToolCard title="日期差值计算器">
+    <ToolSection title="日期差值计算器">
       <div class="flex flex-wrap items-center gap-3">
         <UInput v-model="diffDate1" type="date" class="w-44" />
         <span class="text-muted">→</span>
@@ -143,6 +140,6 @@ const diffResult = computed(() => {
           <div class="text-xs text-muted">分钟</div>
         </div>
       </div>
-    </ToolCard>
-  </ToolLayout>
+    </ToolSection>
+  </ToolPage>
 </template>

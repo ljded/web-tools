@@ -3,9 +3,8 @@ import { ref, watch, onMounted } from 'vue'
 import { useToolState } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 import * as monaco from 'monaco-editor'
 
 const activeTab = ref<'text' | 'image'>('text')
@@ -114,16 +113,14 @@ function clearImg(target: 'a' | 'b') {
 </script>
 
 <template>
-  <ToolLayout max-width="5xl">
-    <ToolHeader title="对比工具" description="文本 Diff 与图片并排/叠加对比" icon="i-lucide-git-compare-arrows" />
-
-    <ToolCard compact>
+  <ToolPage name="diff" max-width="5xl" icon="i-lucide-git-compare-arrows">
+    <ToolSection compact>
       <UTabs v-model="activeTab" :items="[{ label: '文本对比', value: 'text' }, { label: '图片对比', value: 'image' }]" />
-    </ToolCard>
+    </ToolSection>
 
     <!-- 文本对比 -->
     <div v-if="activeTab === 'text'" class="space-y-6">
-      <ToolCard :padding="false" class="min-h-[520px]">
+      <ToolSection :padding="false" class="min-h-[520px]">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-default p-4">
           <HistoryPanel
             :items="history.items.value"
@@ -171,12 +168,12 @@ function clearImg(target: 'a' | 'b') {
             <span class="text-sm text-default">不变 <strong>{{ diffStats.same }}</strong> 行</span>
           </div>
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- 图片对比 -->
     <div v-else class="space-y-6">
-      <ToolCard :padding="false">
+      <ToolSection :padding="false">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-default p-4">
           <UTabs v-model="imgMode" :items="[{ label: '并排对比', value: 'side' }, { label: '叠加对比', value: 'overlay' }]" color="neutral" size="sm" />
           <div v-if="imgMode === 'overlay'" class="flex items-center gap-2">
@@ -191,11 +188,11 @@ function clearImg(target: 'a' | 'b') {
             <div class="mb-2 flex items-center justify-between">
               <span class="text-sm font-medium text-muted">图片 A</span>
               <div class="flex gap-2">
-                <UButton color="neutral" variant="ghost" icon="i-lucide-upload" class="relative rounded-full text-xs">
+                <UButton v-if="!imgA" color="neutral" variant="ghost" icon="i-lucide-upload" class="relative rounded-full text-xs">
                   上传
                   <input type="file" accept="image/*" class="absolute inset-0 cursor-pointer opacity-0" @change="handleImgUpload($event, 'a')" />
                 </UButton>
-                <UButton v-if="imgA" color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('a')" class="rounded-full text-xs">清空</UButton>
+                <UButton v-else color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('a')" class="rounded-full text-xs">清空</UButton>
               </div>
             </div>
             <div class="flex h-48 items-center justify-center rounded-xl bg-elevated transition-colors hover:bg-primary/10" @dragover.prevent @drop="handleImgDrop($event, 'a')">
@@ -207,11 +204,11 @@ function clearImg(target: 'a' | 'b') {
             <div class="mb-2 flex items-center justify-between">
               <span class="text-sm font-medium text-muted">图片 B</span>
               <div class="flex gap-2">
-                <UButton color="neutral" variant="ghost" icon="i-lucide-upload" class="relative rounded-full text-xs">
+                <UButton v-if="!imgB" color="neutral" variant="ghost" icon="i-lucide-upload" class="relative rounded-full text-xs">
                   上传
                   <input type="file" accept="image/*" class="absolute inset-0 cursor-pointer opacity-0" @change="handleImgUpload($event, 'b')" />
                 </UButton>
-                <UButton v-if="imgB" color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('b')" class="rounded-full text-xs">清空</UButton>
+                <UButton v-else color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('b')" class="rounded-full text-xs">清空</UButton>
               </div>
             </div>
             <div class="flex h-48 items-center justify-center rounded-xl bg-elevated transition-colors hover:bg-primary/10" @dragover.prevent @drop="handleImgDrop($event, 'b')">
@@ -235,7 +232,7 @@ function clearImg(target: 'a' | 'b') {
             <img :src="imgB" class="absolute inset-0 m-auto max-h-96 max-w-full rounded-lg object-contain" :style="{ opacity: imgOpacity / 100 }" />
           </div>
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
-  </ToolLayout>
+  </ToolPage>
 </template>

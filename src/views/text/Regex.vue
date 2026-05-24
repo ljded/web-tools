@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useToolState } from '@/composables'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import CopyBtn from '@/components/CopyBtn.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 
 interface MatchItem {
   text: string
@@ -152,10 +151,8 @@ function setPreset(value: string) {
 </script>
 
 <template>
-  <ToolLayout max-width="4xl">
-    <ToolHeader title="正则工具" description="正则匹配、替换、分割和结果高亮" icon="i-lucide-search-code" />
-
-    <ToolCard title="表达式与文本" description="选择预设或输入正则表达式，支持 flags 和历史记录。">
+  <ToolPage name="regex" max-width="4xl" icon="i-lucide-search-code">
+    <ToolSection title="表达式与文本" description="选择预设或输入正则表达式，支持 flags 和历史记录。">
       <template #actions>
         <HistoryPanel
           :items="history.items.value"
@@ -220,7 +217,7 @@ function setPreset(value: string) {
       <UFormField v-if="activeTab === 'replace'" label="替换为" class="mt-3">
         <UInput v-model="replaceWith" placeholder="替换内容..." class="w-full font-mono" />
       </UFormField>
-    </ToolCard>
+    </ToolSection>
 
     <!-- 结果区域 -->
     <ResultPanel v-if="activeTab === 'match'" :title="`高亮结果 (${matches.length} 项匹配)`" :value="matches.map(m => m.text).join('\n')" :copyable="false" :monospace="false" pre-wrap>
@@ -242,5 +239,5 @@ function setPreset(value: string) {
         <div v-for="(s, i) in splitResult" :key="i" class="rounded-xl bg-elevated p-3 font-mono text-sm text-default">{{ s || '(空)' }}</div>
       </div>
     </ResultPanel>
-  </ToolLayout>
+  </ToolPage>
 </template>

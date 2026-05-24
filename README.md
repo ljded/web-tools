@@ -69,8 +69,12 @@ src/
   App.vue                 # UApp、Nuxt UI locale、PWA 更新提示
   main.ts                 # Vue、Pinia、Router、I18n、Nuxt UI plugin 初始化
   style.css               # Tailwind CSS v4 和 Nuxt UI 样式入口
+  app/
+    AppShell.vue          # 应用外壳、主滚动区和全局 overlay 状态
+    AppHeader.vue         # 顶部栏、语言/主题切换、搜索入口
+    AppSidebar.vue        # 基于 UNavigationMenu 的桌面/移动导航
+    AppCommandPalette.vue # 全局工具搜索和快捷跳转
   components/
-    Layout.vue            # 应用外壳、导航、语言和主题切换
     ToolLayout.vue        # 工具页容器宽度与垂直节奏
     ToolHeader.vue        # 工具页标题、说明、图标、actions slot
     ToolCard.vue          # 统一 UCard 包装，支持 compact/flush/padding
@@ -80,12 +84,19 @@ src/
     CopyBtn.vue           # 复制按钮和 Toast 反馈
     MonacoEditor.vue      # Monaco 单编辑器/Diff 编辑器封装
     JsonTree.vue          # JSON 树形预览
+    tool/
+      ToolPage.vue        # 工具页标准骨架，按 registry 自动解析标题/描述/图标
+      ToolSection.vue     # 输入、输出、预览等工具区块统一包装
+      ToolActions.vue     # 复制、下载、清空等动作组布局
   composables/            # 共享组合式逻辑
   i18n/                   # 业务国际化配置
   router/                 # 路由入口
   stores/                 # Pinia store
   tools/
-    registry.ts           # 工具注册表，驱动路由和首页导航
+    registry.ts           # 工具注册表，驱动路由和工具元数据
+    navigation.ts         # 从 registry 派生侧边栏、标题和导航 items
+    search.ts             # 从 registry 派生首页搜索和命令面板索引
+    preload.ts            # 空闲时间预加载工具 chunk
   utils/                  # IndexedDB、历史、持久化、剪贴板等工具
   views/
     crypto/               # 加密安全类工具
@@ -121,7 +132,7 @@ NuxtUI({
 - 业务文案通过 `vue-i18n` 管理，Nuxt UI 组件内置文案通过 `@nuxt/ui/locale` 对象配置。
 - 样式优先使用 Nuxt UI 语义 token，例如 `text-default`、`text-muted`、`bg-elevated`、`border-default`、`text-success`。
 - 图标使用 Iconify 格式，例如 `i-lucide-copy`、`i-lucide-file-up`。
-- 工具页优先使用共享骨架：`ToolLayout` -> `ToolHeader` -> `ToolCard` -> `ResultPanel`。
+- 工具页优先使用共享骨架：`ToolPage` -> `ToolSection` -> `ResultPanel`。复杂工具可继续组合 `ToolLayout`、`ToolHeader`、`ToolCard`。
 - 文件上传入口优先使用 `FileDropZone`，但 Monaco、canvas、PDF、worker、原生文件 input、取色器 fallback 等浏览器能力可以保留原生实现。
 
 ## 工具页结构
@@ -129,13 +140,13 @@ NuxtUI({
 推荐结构：
 
 ```vue
-<ToolLayout max-width="4xl">
-  <ToolHeader title="工具标题" description="工具说明" icon="i-lucide-wrench" />
-
-  <ToolCard>
+<ToolPage name="tool-name" max-width="4xl">
+  <ToolSection title="输入" description="当前工具的模式选项、输入区和参数。">
     <!-- 当前工具的模式选项、输入区、输出区 -->
-  </ToolCard>
-</ToolLayout>
+  </ToolSection>
+
+  <ResultPanel title="结果" :value="result" />
+</ToolPage>
 ```
 
 如果工具内有切换项，优先放在输入输出区顶部，而不是拆成多个分散卡片。结果内容优先通过 `ResultPanel` 展示，复制行为由 `CopyBtn` 或 `ResultPanel` 内置复制按钮处理。
@@ -210,7 +221,7 @@ npm run test:e2e
 ## 新增工具流程
 
 1. 在 `src/views/<domain>/` 下创建工具页面。
-2. 使用 `ToolLayout`、`ToolHeader`、`ToolCard`、`ResultPanel` 等共享组件保持视觉统一。
-3. 在 `src/tools/registry.ts` 中注册工具定义，包括 `name`、`path`、`i18nKey`、`domain`、`icon`、`color`、`component`、`keywords`、`tags`。
+2. 使用 `ToolPage`、`ToolSection`、`ResultPanel` 等共享组件保持视觉统一；复杂页面可继续组合底层 `ToolLayout`、`ToolHeader`、`ToolCard`。
+3. 在 `src/tools/registry.ts` 中注册工具定义，包括 `name`、`path`、`i18nKey`、`domain`、`icon`、`color`、`component`、`keywords`、`tags`、`capabilities`。
 4. 在 `src/i18n/` 中补充业务文案。
 5. 运行 `npm run type-check`、`npm run test`、`npm run build` 验证。

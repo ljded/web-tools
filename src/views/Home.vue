@@ -1,31 +1,24 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { tools } from '@/tools/registry'
+import { preloadAllTools } from '@/tools/preload'
+import { searchTools } from '@/tools/search'
 
 const router = useRouter()
 const { t } = useI18n()
+const search = ref('')
 
 const toolCards = computed(() =>
-  tools.map((tool) => ({
+  searchTools(t, search.value).map(({ tool, label, description }) => ({
     ...tool,
-    label: t(`${tool.i18nKey}.title`),
-    desc: t(`${tool.i18nKey}.desc`),
+    label,
+    desc: description,
   })),
 )
 
 function go(path: string) { router.push(path) }
-
-function preloadTool(component: () => Promise<unknown>) {
-  try { component() } catch { /* silent */ }
-}
-function preloadAllTools() {
-  const schedule = typeof requestIdleCallback !== 'undefined'
-    ? (fn: () => void) => requestIdleCallback(fn, { timeout: 3000 })
-    : (fn: () => void) => setTimeout(fn, 200)
-  schedule(() => { for (const tool of tools) schedule(() => preloadTool(tool.component)) })
-}
 onMounted(preloadAllTools)
 </script>
 
@@ -78,6 +71,14 @@ onMounted(preloadAllTools)
         {{ t('app.toolsCount', { count: toolCards.length }) }}
       </UBadge>
     </div>
+
+    <UInput
+      v-model="search"
+      icon="i-lucide-search"
+      :placeholder="t('app.searchTools')"
+      size="lg"
+      class="max-w-xl"
+    />
 
     <!-- Tool grid -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

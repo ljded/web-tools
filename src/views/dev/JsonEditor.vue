@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useToolState } from '@/composables'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import CopyBtn from '@/components/CopyBtn.vue'
 import JsonTree from '@/components/JsonTree.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 
 const { input, history, saveHistory } = useToolState<string, { input: string }>({
   storageKey: 'json',
@@ -105,10 +104,8 @@ watch(input, validateJson, { immediate: true })
 </script>
 
 <template>
-  <ToolLayout max-width="6xl">
-    <ToolHeader title="JSON 编辑器" description="格式化、压缩、转义、JWT 解析与树形预览" icon="i-lucide-braces" />
-
-    <ToolCard :padding="false">
+  <ToolPage name="json" max-width="6xl">
+    <ToolSection :padding="false">
       <div class="flex flex-wrap items-center justify-between gap-2 border-b border-default px-4 py-3">
         <span class="text-sm font-medium text-muted">JSON 编辑器</span>
         <div class="flex flex-wrap items-center gap-2">
@@ -157,6 +154,6 @@ watch(input, validateJson, { immediate: true })
           {{ error || status }}
         </UBadge>
       </div>
-    </ToolCard>
-  </ToolLayout>
+    </ToolSection>
+  </ToolPage>
 </template>

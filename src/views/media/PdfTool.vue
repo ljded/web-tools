@@ -4,10 +4,9 @@ import { degrees, PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { usePersistedRef } from '@/utils/persist'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import FileDropZone from '@/components/FileDropZone.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 const toast = useToast()
@@ -243,13 +242,11 @@ const tabItems = [
 </script>
 
 <template>
-  <ToolLayout max-width="4xl">
-    <ToolHeader title="PDF 工具" description="压缩、合并、拆分、添加水印、转为图片" icon="i-lucide-file-text" />
-
+  <ToolPage name="pdf" max-width="4xl">
     <UTabs v-model="activeTab" :items="tabItems" />
 
     <!-- 压缩 -->
-    <ToolCard v-if="activeTab === 'compress'">
+    <ToolSection v-if="activeTab === 'compress'">
       <div class="space-y-4">
         <FileDropZone accept=".pdf" title="选择 PDF" hint="或拖拽 PDF 到此处" @files="onCompressFiles" />
         <USelect v-model="compressLevel" :items="[{ label: '轻度', value: 'light' }, { label: '中等', value: 'medium' }, { label: '强力', value: 'strong' }]" label="压缩级别" />
@@ -258,10 +255,10 @@ const tabItems = [
           {{ compressLoading ? '压缩中...' : '压缩并下载' }}
         </UButton>
       </div>
-    </ToolCard>
+    </ToolSection>
 
     <!-- 合并 -->
-    <ToolCard v-if="activeTab === 'merge'">
+    <ToolSection v-if="activeTab === 'merge'">
       <div class="space-y-4">
         <FileDropZone accept=".pdf" multiple title="选择 PDF" hint="或拖拽 PDF 到此处（可多选）" @files="addMergeFiles" />
         <div v-if="mergeFiles.length" class="space-y-2">
@@ -279,10 +276,10 @@ const tabItems = [
           {{ mergeLoading ? '合并中...' : '合并并下载' }}
         </UButton>
       </div>
-    </ToolCard>
+    </ToolSection>
 
     <!-- 拆分 -->
-    <ToolCard v-if="activeTab === 'split'">
+    <ToolSection v-if="activeTab === 'split'">
       <div class="space-y-4">
         <FileDropZone accept=".pdf" title="选择 PDF" hint="或拖拽 PDF 到此处" @files="onSplitFiles" />
         <UFormField label="页码范围（如: 1-3,5）">
@@ -293,10 +290,10 @@ const tabItems = [
           {{ splitLoading ? '拆分中...' : '拆分并下载' }}
         </UButton>
       </div>
-    </ToolCard>
+    </ToolSection>
 
     <!-- 水印 -->
-    <ToolCard v-if="activeTab === 'watermark'">
+    <ToolSection v-if="activeTab === 'watermark'">
       <div class="space-y-4">
         <FileDropZone accept=".pdf" title="选择 PDF" hint="或拖拽 PDF 到此处" @files="onWmFiles" />
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -313,10 +310,10 @@ const tabItems = [
           {{ wmLoading ? '处理中...' : '添加水印并下载' }}
         </UButton>
       </div>
-    </ToolCard>
+    </ToolSection>
 
     <!-- 转图片 -->
-    <ToolCard v-if="activeTab === 'toImage'">
+    <ToolSection v-if="activeTab === 'toImage'">
       <div class="space-y-4">
         <FileDropZone accept=".pdf" title="选择 PDF" hint="或拖拽 PDF 到此处" @files="onTiFiles" />
         <UFormField :label="`DPI: ${tiDpi}`">
@@ -332,6 +329,6 @@ const tabItems = [
           </div>
         </div>
       </div>
-    </ToolCard>
-  </ToolLayout>
+    </ToolSection>
+  </ToolPage>
 </template>

@@ -22,6 +22,7 @@ export default {
     copied: 'Copied',
     clear: 'Clear',
     search: 'Search',
+    searchTools: 'Search tools, keywords, or capabilities...',
     format: 'Format',
     compress: 'Compress',
     download: 'Download',

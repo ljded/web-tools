@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { RouterView } from 'vue-router'
-import Layout from './components/Layout.vue'
+import AppShell from './app/AppShell.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
 import { usePreferenceStore } from './stores/preference'
 import { en, zh_cn } from '@nuxt/ui/locale'
@@ -47,10 +47,10 @@ function promptUpdate(worker: ServiceWorker) {
 
 <template>
   <UApp :locale="uiLocale">
-    <Layout>
+    <AppShell>
       <ErrorBoundary>
         <RouterView />
       </ErrorBoundary>
-    </Layout>
+    </AppShell>
   </UApp>
 </template>

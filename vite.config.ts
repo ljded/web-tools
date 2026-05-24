@@ -47,8 +47,9 @@ export default defineConfig({
         navigateFallback: 'index.html',
         runtimeCaching: [
           {
-            urlPattern: ({ request }) =>
-              request.destination === 'image' || request.destination === 'font',
+            urlPattern: ({ request, sameOrigin }) =>
+              sameOrigin &&
+              (request.destination === 'image' || request.destination === 'font'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'web-tools-static',

@@ -2,11 +2,10 @@
 import { ref, watch, computed } from 'vue'
 import { useToolState, useFileHandler, useDebouncedCompute } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import FileDropZone from '@/components/FileDropZone.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 import HashWorker from '@/workers/hash.worker?worker'
 import { createWorkerPool } from '@/workers/pool'
 
@@ -120,10 +119,8 @@ const displayResults = computed(() => {
 </script>
 
 <template>
-  <ToolLayout max-width="3xl">
-    <ToolHeader title="哈希工具" description="文本与大文件 MD5 / SHA1 / SHA256 / SHA512 分块计算" icon="i-lucide-fingerprint" />
-
-    <ToolCard title="输入内容" description="输入文本或拖拽文件，文件会使用 Worker 分块计算。">
+  <ToolPage name="hash" max-width="3xl" icon="i-lucide-fingerprint">
+    <ToolSection title="输入内容" description="输入文本或拖拽文件，文件会使用 Worker 分块计算。">
       <template #actions>
         <HistoryPanel
           :items="history.items.value"
@@ -182,7 +179,7 @@ const displayResults = computed(() => {
         :max="100"
         class="mt-3"
       />
-    </ToolCard>
+    </ToolSection>
 
     <div class="space-y-3">
       <ResultPanel
@@ -196,5 +193,5 @@ const displayResults = computed(() => {
         <span v-else>{{ item.value || '等待输入...' }}</span>
       </ResultPanel>
     </div>
-  </ToolLayout>
+  </ToolPage>
 </template>

@@ -21,6 +21,7 @@ export default {
     copied: '已复制',
     clear: '清空',
     search: '搜索',
+    searchTools: '搜索工具、关键词或能力...',
     format: '格式化',
     compress: '压缩',
     download: '下载',

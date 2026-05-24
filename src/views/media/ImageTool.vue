@@ -2,9 +2,8 @@
 import { computed, ref } from 'vue'
 import { usePersistedRef } from '@/utils/persist'
 import { compressImageFile } from '@/utils/imageCompression'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 
 interface FileItem {
   file: File
@@ -177,15 +176,13 @@ const ops = [
 </script>
 
 <template>
-  <ToolLayout max-width="5xl">
-    <ToolHeader title="图片工具" description="批量压缩、格式转换、缩放、水印、旋转、裁剪" icon="i-lucide-image">
-      <template #actions>
-        <UTabs v-model="batchOp" :items="ops.map(o => ({ label: o.label, value: o.value, icon: o.icon }))" />
-      </template>
-    </ToolHeader>
+  <ToolPage name="image" max-width="5xl">
+    <template #actions>
+      <UTabs v-model="batchOp" :items="ops.map(o => ({ label: o.label, value: o.value, icon: o.icon }))" />
+    </template>
 
     <!-- 参数面板 -->
-    <ToolCard title="处理参数" compact>
+    <ToolSection title="处理参数" compact>
       <div class="flex flex-wrap items-end gap-4">
         <template v-if="batchOp === 'compress'">
           <UFormField label="质量">
@@ -226,10 +223,10 @@ const ops = [
           </div>
         </template>
       </div>
-    </ToolCard>
+    </ToolSection>
 
     <!-- 上传+处理 -->
-    <ToolCard title="上传与处理" compact>
+    <ToolSection title="上传与处理" compact>
       <template #actions>
         <UButton color="primary" @click="processAll" :disabled="!files.length" class="rounded-full px-5 py-2.5 text-sm">
           <template #leading><UIcon name="i-lucide-play" class="size-4" /></template>全部处理
@@ -271,6 +268,6 @@ const ops = [
           <UButton color="neutral" variant="ghost" icon="i-lucide-trash2" @click="removeItem(i)" class="rounded-full" />
         </div>
       </div>
-    </ToolCard>
-  </ToolLayout>
+    </ToolSection>
+  </ToolPage>
 </template>
