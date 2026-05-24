@@ -52,7 +52,7 @@ function onSm2HistorySelect(item: { data: { text: string; mode: string } }) { sm
 
 async function genSm2Keys() {
   const lease = await cryptoWorkerPool.acquire()
-  try { const keys = await lease.send<{ publicKey: string; privateKey: string }>({ type: 'sm2-gen-keys' }); sm2PubKey.value = keys.publicKey; sm2PriKey.value = keys.privateKey }
+  try { const keys = await lease.send<{ pub: string; pri: string }>({ type: 'sm2-gen-keys' }); sm2PubKey.value = keys.pub; sm2PriKey.value = keys.pri }
   catch (e: any) { sm2Error.value = e?.message || '生成失败' }
   finally { lease.release() }
 }
@@ -81,7 +81,7 @@ function onRsaHistorySelect(item: { data: { text: string; mode: string } }) { rs
 
 async function genRsaKeys() {
   const lease = await rsaWorkerPool.acquire()
-  try { const keys = await lease.send<{ publicKey: string; privateKey: string }>({ type: 'generate' }); rsaPubKey.value = keys.publicKey; rsaPriKey.value = keys.privateKey }
+  try { const keys = await lease.send<{ pub: string; pri: string }>({ type: 'generate', size: 2048 }); rsaPubKey.value = keys.pub; rsaPriKey.value = keys.pri }
   catch (e: any) { rsaError.value = e?.message || '生成失败' }
   finally { lease.release() }
 }

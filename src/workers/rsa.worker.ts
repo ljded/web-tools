@@ -21,8 +21,8 @@ ctx.onmessage = (event) => {
     if (payload.type !== 'generate') throw new Error('不支持的 RSA 命令')
     const encrypt = new JSEncrypt({ default_key_size: String(payload.size || 2048) })
     ok(id, {
-      publicKey: encrypt.getPublicKey(),
-      privateKey: encrypt.getPrivateKey(),
+      pub: encrypt.getPublicKey(),
+      pri: encrypt.getPrivateKey(),
     })
   } catch (error) {
     fail(id, error)

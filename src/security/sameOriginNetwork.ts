@@ -22,7 +22,11 @@ export function installSameOriginNetworkGuard() {
 
   const nativeFetch = window.fetch.bind(window)
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
-    assertSameOrigin(getRequestUrl(input), 'fetch')
+    try {
+      assertSameOrigin(getRequestUrl(input), 'fetch')
+    } catch (err) {
+      return Promise.reject(err)
+    }
     return nativeFetch(input, init)
   }) as typeof window.fetch
 

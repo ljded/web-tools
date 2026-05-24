@@ -98,7 +98,7 @@ onMounted(preloadAllTools)
             'bg-info/10 text-info': tool.color === 'info',
             'bg-warning/10 text-warning': tool.color === 'warning',
             'bg-error/10 text-error': tool.color === 'error',
-            'bg-neutral/10 text-muted': tool.color === 'neutral',
+            'bg-default text-default': tool.color === 'neutral',
           }"
         >
           <UIcon :name="tool.icon" class="size-6" />

@@ -91,6 +91,7 @@ const imgMode = ref<'side' | 'overlay'>('side')
 function handleImgUpload(e: Event, target: 'a' | 'b') {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (file) setImgFile(file, target)
+  ;(e.target as HTMLInputElement).value = ''
 }
 function setImgFile(file: File, target: 'a' | 'b') {
   if (!file) return
@@ -176,10 +177,12 @@ function clearImg(target: 'a' | 'b') {
       <ToolSection :padding="false">
         <div class="flex flex-wrap items-center justify-between gap-3 border-b border-default p-4">
           <UTabs v-model="imgMode" :items="[{ label: '并排对比', value: 'side' }, { label: '叠加对比', value: 'overlay' }]" color="neutral" size="sm" />
-          <div v-if="imgMode === 'overlay'" class="flex items-center gap-2">
-            <span class="text-xs text-muted">透明度</span>
-            <USlider v-model="imgOpacity" :min="0" :max="100" :step="1" class="w-32" />
-            <span class="text-xs text-default">{{ imgOpacity }}%</span>
+          <div class="flex items-center gap-3">
+            <div v-if="imgMode === 'overlay'" class="flex items-center gap-2">
+              <span class="text-xs text-muted">透明度</span>
+              <USlider v-model="imgOpacity" :min="0" :max="100" :step="1" class="w-32" />
+              <span class="text-xs text-default">{{ imgOpacity }}%</span>
+            </div>
           </div>
         </div>
 
@@ -187,34 +190,24 @@ function clearImg(target: 'a' | 'b') {
           <div>
             <div class="mb-2 flex items-center justify-between">
               <span class="text-sm font-medium text-muted">图片 A</span>
-              <div class="flex gap-2">
-                <UButton v-if="!imgA" color="neutral" variant="ghost" icon="i-lucide-upload" class="relative rounded-full text-xs">
-                  上传
-                  <input type="file" accept="image/*" class="absolute inset-0 cursor-pointer opacity-0" @change="handleImgUpload($event, 'a')" />
-                </UButton>
-                <UButton v-else color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('a')" class="rounded-full text-xs">清空</UButton>
-              </div>
+              <UButton v-if="imgA" color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('a')" class="rounded-full text-xs">清空</UButton>
             </div>
-            <div class="flex h-48 items-center justify-center rounded-xl bg-elevated transition-colors hover:bg-primary/10" @dragover.prevent @drop="handleImgDrop($event, 'a')">
+            <label class="flex h-48 cursor-pointer items-center justify-center rounded-xl bg-elevated transition-colors hover:bg-primary/10" @dragover.prevent @drop="handleImgDrop($event, 'a')">
               <img v-if="imgA" :src="imgA" class="max-h-full max-w-full rounded-lg object-contain" />
-              <span v-else class="text-xs text-muted">请上传或拖拽图片</span>
-            </div>
+              <span v-else class="text-xs text-muted">点击上传或拖拽图片</span>
+              <input type="file" accept="image/*" class="hidden" @change="handleImgUpload($event, 'a')" />
+            </label>
           </div>
           <div>
             <div class="mb-2 flex items-center justify-between">
               <span class="text-sm font-medium text-muted">图片 B</span>
-              <div class="flex gap-2">
-                <UButton v-if="!imgB" color="neutral" variant="ghost" icon="i-lucide-upload" class="relative rounded-full text-xs">
-                  上传
-                  <input type="file" accept="image/*" class="absolute inset-0 cursor-pointer opacity-0" @change="handleImgUpload($event, 'b')" />
-                </UButton>
-                <UButton v-else color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('b')" class="rounded-full text-xs">清空</UButton>
-              </div>
+              <UButton v-if="imgB" color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('b')" class="rounded-full text-xs">清空</UButton>
             </div>
-            <div class="flex h-48 items-center justify-center rounded-xl bg-elevated transition-colors hover:bg-primary/10" @dragover.prevent @drop="handleImgDrop($event, 'b')">
+            <label class="flex h-48 cursor-pointer items-center justify-center rounded-xl bg-elevated transition-colors hover:bg-primary/10" @dragover.prevent @drop="handleImgDrop($event, 'b')">
               <img v-if="imgB" :src="imgB" class="max-h-full max-w-full rounded-lg object-contain" />
-              <span v-else class="text-xs text-muted">请上传或拖拽图片</span>
-            </div>
+              <span v-else class="text-xs text-muted">点击上传或拖拽图片</span>
+              <input type="file" accept="image/*" class="hidden" @change="handleImgUpload($event, 'b')" />
+            </label>
           </div>
         </div>
 

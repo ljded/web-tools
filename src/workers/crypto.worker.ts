@@ -86,7 +86,7 @@ ctx.onmessage = (event) => {
       }
       case 'sm2-gen-keys': {
         const keys = sm2.generateKeyPairHex()
-        ok(id, { publicKey: keys.publicKey, privateKey: keys.privateKey })
+        ok(id, { pub: keys.publicKey, pri: keys.privateKey })
         return
       }
       default:
