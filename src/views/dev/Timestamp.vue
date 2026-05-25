@@ -25,6 +25,7 @@ onUnmounted(() => clearInterval(timer))
 const { input: dateInput, history, saveHistory } = useToolState<string, { dateInput: string }>({
   storageKey: 'timestamp',
   defaultInput: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+  getHistoryData: (value) => ({ dateInput: value }),
   historyOptions: { maxCount: 10, generateLabel: (d) => d.dateInput.slice(0, 30) },
 })
 

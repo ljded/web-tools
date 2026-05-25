@@ -15,6 +15,7 @@ const activeTab = usePersistedRef<'generate' | 'parse'>('web-tools:qrcode:tab', 
 const { input: text, history: genHistory, saveHistory: saveGenHistory } = useToolState<string, { text: string }>({
   storageKey: 'qrcode:gen',
   defaultInput: 'Web Tools - 本地离线工具集',
+  getHistoryData: (value) => ({ text: value }),
   historyOptions: {
     maxCount: 10,
     generateLabel: (d) => d.text.slice(0, 40) + (d.text.length > 40 ? '...' : ''),
@@ -24,6 +25,7 @@ const { input: text, history: genHistory, saveHistory: saveGenHistory } = useToo
 const { input: parseInput, history: parseHistory, saveHistory: saveParseHistory } = useToolState<string, { input: string }>({
   storageKey: 'qrcode:parse',
   defaultInput: '',
+  getHistoryData: (value) => ({ input: value }),
   historyOptions: {
     maxCount: 10,
     generateLabel: (d) => d.input.slice(0, 40) + (d.input.length > 40 ? '...' : ''),

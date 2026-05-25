@@ -13,6 +13,7 @@ const eyeDropperError = ref('')
 const { input: hex, history, saveHistory } = useToolState<string, { hex: string }>({
   storageKey: 'color',
   defaultInput: '#6750a4',
+  getHistoryData: (value) => ({ hex: value }),
   historyOptions: { maxCount: 15, generateLabel: (d) => d.hex.toUpperCase() },
 })
 

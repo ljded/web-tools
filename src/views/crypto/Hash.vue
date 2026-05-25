@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
-import { useToolState, useFileHandler, useDebouncedCompute } from '@/composables'
+import { onUnmounted, ref, watch, computed } from 'vue'
+import { useToolState, useFileHandler, useDebouncedCompute, useLatestTask } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import FileDropZone from '@/components/FileDropZone.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
@@ -15,6 +15,7 @@ const MAX_FILE_HASH_BYTES = 2 * 1024 * 1024 * 1024
 const { input, history, saveHistory, reset } = useToolState<string, { input: string }>({
   storageKey: 'hash',
   defaultInput: '',
+  getHistoryData: (value) => ({ input: value }),
   historyOptions: {
     maxCount: 15,
     generateLabel: (d) => d.input.slice(0, 50) + (d.input.length > 50 ? '...' : ''),
@@ -23,6 +24,8 @@ const { input, history, saveHistory, reset } = useToolState<string, { input: str
 
 const fileHandler = useFileHandler({ maxSize: MAX_FILE_HASH_BYTES })
 const hashWorkerPool = createWorkerPool(() => new HashWorker(), { size: 2 })
+const latestTextHash = useLatestTask()
+const latestFileHash = useLatestTask()
 
 const fileHashes = ref<Record<string, string>>({})
 const isComputing = ref(false)
@@ -35,6 +38,7 @@ function onHistorySelect(item: { data: { input: string } }) {
 }
 
 async function computeTextHashes() {
+  const isCurrent = latestTextHash.next()
   const text = input.value
   if (!text) {
     textResults.value = []
@@ -50,9 +54,9 @@ async function computeTextHashes() {
   try {
     textHashNotice.value = ''
     const result = await lease.send<Record<string, string>>({ type: 'text', text })
-    textResults.value = Object.entries(result).map(([name, value]) => ({ name, value }))
+    if (isCurrent()) textResults.value = Object.entries(result).map(([name, value]) => ({ name, value }))
   } catch {
-    textResults.value = []
+    if (isCurrent()) textResults.value = []
   } finally {
     lease.release()
   }
@@ -72,7 +76,13 @@ function setFile(f: File) {
   computeFileHash()
 }
 
+function clearFile() {
+  fileHandler.removeFile()
+  fileHashes.value = {}
+}
+
 async function computeFileHash() {
+  const isCurrent = latestFileHash.next()
   const file = fileHandler.file.value
   if (!file) return
   isComputing.value = true
@@ -90,20 +100,29 @@ async function computeFileHash() {
       const { done, value } = await reader.read()
       if (done) break
       readBytes += value.byteLength
-      hashProgress.value = Math.round((readBytes / file.size) * 100)
+      if (isCurrent()) hashProgress.value = Math.round((readBytes / file.size) * 100)
       const chunk = value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength)
       await lease.send({ type: 'file-chunk', sessionId, chunk }, [chunk])
     }
 
-    fileHashes.value = await lease.send<Record<string, string>>({ type: 'file-finish', sessionId })
+    const result = await lease.send<Record<string, string>>({ type: 'file-finish', sessionId })
+    if (isCurrent()) fileHashes.value = result
   } catch {
-    fileHashes.value = { 错误: '计算出错' }
+    if (isCurrent()) fileHashes.value = { 错误: '计算出错' }
   } finally {
     lease.release()
-    isComputing.value = false
-    hashProgress.value = 0
+    if (isCurrent()) {
+      isComputing.value = false
+      hashProgress.value = 0
+    }
   }
 }
+
+onUnmounted(() => {
+  latestTextHash.cancel()
+  latestFileHash.cancel()
+  hashWorkerPool.terminate()
+})
 
 function onFiles(files: File[]) {
   const [first] = files
@@ -156,7 +175,7 @@ const displayResults = computed(() => {
           icon="i-lucide-x"
           color="neutral"
           variant="ghost"
-          @click="fileHandler.removeFile(); fileHashes = {}"
+          @click="clearFile"
           class="rounded-full"
         />
       </div>

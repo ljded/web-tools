@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useClipboard } from '@/composables'
+
+const { t } = useI18n()
 
 interface Props {
   text: string
@@ -20,7 +23,7 @@ const props = withDefaults(defineProps<Props>(), {
 const { copied, copy } = useClipboard()
 
 async function handleCopy() {
-  await copy(props.text, props.msg)
+  await copy(props.text, props.msg || t('app.copySuccess'))
 }
 </script>
 
@@ -40,6 +43,6 @@ async function handleCopy() {
     ]"
     @click="handleCopy"
   >
-    <span v-if="!compact" class="text-xs">{{ copied ? '已复制' : '复制' }}</span>
+    <span v-if="!compact" class="text-xs">{{ copied ? t('app.copied') : t('app.copy') }}</span>
   </UButton>
 </template>

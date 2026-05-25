@@ -1,8 +1,25 @@
-import { ref, watch, type WatchSource } from 'vue'
+import { onUnmounted, ref, watch, type WatchSource } from 'vue'
 
 export interface DebouncedComputeOptions {
   delay?: number
   immediate?: boolean
+}
+
+export function useLatestTask() {
+  let generation = 0
+
+  function next() {
+    const current = ++generation
+    return () => current === generation
+  }
+
+  function cancel() {
+    generation++
+  }
+
+  onUnmounted(cancel)
+
+  return { next, cancel }
 }
 
 export function useDebouncedCompute<T>(
@@ -43,6 +60,8 @@ export function useDebouncedCompute<T>(
     generation++ // 使进行中的 async 结果无效
     isComputing.value = false
   }
+
+  onUnmounted(cancel)
 
   return {
     isComputing,

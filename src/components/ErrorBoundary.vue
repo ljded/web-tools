@@ -1,13 +1,19 @@
 <script setup lang="ts">
-import { onErrorCaptured, ref } from 'vue'
+import { computed, onErrorCaptured, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
+const { t } = useI18n()
 const error = ref<unknown>(null)
 const toast = useToast()
+const errorText = computed(() => {
+  if (!error.value) return ''
+  return error.value instanceof Error ? error.value.message : String(error.value)
+})
 
 onErrorCaptured((err) => {
   error.value = err
   toast.add({
-    title: err instanceof Error ? err.message : '工具页面运行异常',
+    title: err instanceof Error ? err.message : t('app.toolRuntimeErrorTitle'),
     color: 'error',
     duration: 5000,
   })
@@ -31,13 +37,13 @@ function reset() {
         <UIcon name="i-lucide-alert-triangle" class="size-5" />
       </div>
       <div class="min-w-0 flex-1">
-        <h2 class="text-lg font-semibold text-highlighted">工具页面发生异常</h2>
+        <h2 class="text-lg font-semibold text-highlighted">{{ t('app.toolRuntimeErrorTitle') }}</h2>
         <p class="mt-1 text-sm leading-6 text-muted">
-          已拦截未处理错误，避免应用白屏。可以返回首页或重试当前页面。
+          {{ t('app.toolRuntimeErrorDesc') }}
         </p>
-        <pre class="mt-3 max-h-40 overflow-auto rounded-xl bg-elevated p-3 text-xs text-muted">{{ error }}</pre>
+        <pre class="mt-3 max-h-40 overflow-auto rounded-xl bg-elevated p-3 text-xs text-muted">{{ errorText }}</pre>
         <UButton
-          label="重试"
+          :label="t('app.retry')"
           icon="i-lucide-refresh-cw"
           color="primary"
           class="mt-4 rounded-full"

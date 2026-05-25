@@ -20,6 +20,7 @@ const encodeError = ref('')
 const { input, history, saveHistory } = useToolState<string, { mode: 'encode' | 'decode'; input: string }>({
   storageKey: 'base64',
   defaultInput: '',
+  getHistoryData: (value) => ({ mode: mode.value, input: value }),
   historyOptions: {
     maxCount: 15,
     generateLabel: (d) => `[${d.mode === 'encode' ? '编码' : '解码'}] ${d.input.slice(0, 40)}${d.input.length > 40 ? '...' : ''}`,

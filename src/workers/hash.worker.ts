@@ -2,6 +2,7 @@ import CryptoJS from 'crypto-js'
 import { sm3 } from 'sm-crypto'
 
 type HashCommand =
+  | { type: 'ping' }
   | { type: 'text'; text: string }
   | { type: 'file-start' }
   | { type: 'file-chunk'; chunk: ArrayBuffer }
@@ -49,6 +50,11 @@ ctx.onmessage = (event) => {
         SHA512: CryptoJS.SHA512(payload.text).toString(),
         SM3: sm3(payload.text),
       })
+      return
+    }
+
+    if (payload.type === 'ping') {
+      ok(id, { pong: true })
       return
     }
 

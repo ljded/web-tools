@@ -62,6 +62,24 @@ export function createAppNavigation(
   ]
 }
 
+export function createFavoriteNavigationItems(
+  t: Translate,
+  currentPath: string,
+  favoriteToolNames: string[],
+  onNavigate?: () => void,
+): AppNavigationItem[] {
+  return favoriteToolNames
+    .map((name) => tools.find((tool) => tool.name === name))
+    .filter((tool): tool is NonNullable<typeof tool> => Boolean(tool))
+    .map((tool) => ({
+      label: t(`${tool.i18nKey}.title`),
+      icon: tool.icon,
+      to: tool.path,
+      active: currentPath === tool.path,
+      onSelect: onNavigate,
+    }))
+}
+
 export function getCurrentNavigationTitle(t: Translate, currentPath: string): string {
   if (currentPath === '/') return t('nav.home')
 

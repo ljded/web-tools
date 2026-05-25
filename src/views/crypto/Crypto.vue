@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { onUnmounted, ref, watch, computed } from 'vue'
 import { usePersistedRef } from '@/utils/persist'
 import { useHistory } from '@/utils/history'
+import { useLatestTask } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
@@ -15,6 +16,23 @@ const rsaWorkerPool = createWorkerPool(() => new RsaWorker(), { size: 1 })
 const cryptoWorkerPool = createWorkerPool(() => new CryptoWorker(), { size: 2 })
 const MAX_TEXT_CRYPTO_CHARS = 100_000
 const MAX_ASYMMETRIC_CHARS = 4_000
+const latestAes = useLatestTask()
+const latestSm2 = useLatestTask()
+const latestRsa = useLatestTask()
+const latestJwt = useLatestTask()
+const latestBcrypt = useLatestTask()
+const latestSm4 = useLatestTask()
+
+onUnmounted(() => {
+  latestAes.cancel()
+  latestSm2.cancel()
+  latestRsa.cancel()
+  latestJwt.cancel()
+  latestBcrypt.cancel()
+  latestSm4.cancel()
+  rsaWorkerPool.terminate()
+  cryptoWorkerPool.terminate()
+})
 
 function isTooLong(text: string, max: number) { return text.length > max }
 
@@ -29,13 +47,14 @@ function saveAesHistory() { if (!aesText.value.trim()) return; aesHistory.add({ 
 function onAesHistorySelect(item: { data: { text: string; key: string; mode: string } }) { aesText.value = item.data.text; aesKey.value = item.data.key; aesMode.value = item.data.mode as any }
 
 async function computeAes() {
-  if (!aesText.value || !aesKey.value) { aesResult.value = ''; aesError.value = ''; return }
-  if (isTooLong(aesText.value, MAX_TEXT_CRYPTO_CHARS)) { aesResult.value = ''; aesError.value = '输入过长'; return }
+  const isCurrent = latestAes.next()
+  if (!aesText.value || !aesKey.value) { aesResult.value = ''; aesError.value = ''; aesLoading.value = false; return }
+  if (isTooLong(aesText.value, MAX_TEXT_CRYPTO_CHARS)) { aesResult.value = ''; aesError.value = '输入过长'; aesLoading.value = false; return }
   aesLoading.value = true; aesError.value = ''
   const lease = await cryptoWorkerPool.acquire()
-  try { aesResult.value = await lease.send<string>({ type: 'aes', text: aesText.value, key: aesKey.value, mode: aesMode.value }) }
-  catch (e: any) { aesError.value = e?.message || 'AES 操作失败'; aesResult.value = '' }
-  finally { aesLoading.value = false; lease.release() }
+  try { const result = await lease.send<string>({ type: 'aes', text: aesText.value, key: aesKey.value, mode: aesMode.value }); if (isCurrent()) aesResult.value = result }
+  catch (e: any) { if (isCurrent()) { aesError.value = e?.message || 'AES 操作失败'; aesResult.value = '' } }
+  finally { if (isCurrent()) aesLoading.value = false; lease.release() }
 }
 watch([aesText, aesKey, aesMode], () => computeAes(), { immediate: true })
 
@@ -58,13 +77,14 @@ async function genSm2Keys() {
 }
 
 async function computeSm2() {
-  if (!sm2Text.value) { sm2Result.value = ''; sm2Error.value = ''; return }
-  if (isTooLong(sm2Text.value, MAX_ASYMMETRIC_CHARS)) { sm2Result.value = ''; sm2Error.value = '输入过长'; return }
+  const isCurrent = latestSm2.next()
+  if (!sm2Text.value) { sm2Result.value = ''; sm2Error.value = ''; sm2Loading.value = false; return }
+  if (isTooLong(sm2Text.value, MAX_ASYMMETRIC_CHARS)) { sm2Result.value = ''; sm2Error.value = '输入过长'; sm2Loading.value = false; return }
   sm2Loading.value = true; sm2Error.value = ''
   const lease = await cryptoWorkerPool.acquire()
-  try { sm2Result.value = await lease.send<string>({ type: 'sm2', text: sm2Text.value, pub: sm2PubKey.value, pri: sm2PriKey.value, mode: sm2Mode.value }) }
-  catch (e: any) { sm2Error.value = e?.message || 'SM2 操作失败'; sm2Result.value = '' }
-  finally { sm2Loading.value = false; lease.release() }
+  try { const result = await lease.send<string>({ type: 'sm2', text: sm2Text.value, pub: sm2PubKey.value, pri: sm2PriKey.value, mode: sm2Mode.value }); if (isCurrent()) sm2Result.value = result }
+  catch (e: any) { if (isCurrent()) { sm2Error.value = e?.message || 'SM2 操作失败'; sm2Result.value = '' } }
+  finally { if (isCurrent()) sm2Loading.value = false; lease.release() }
 }
 watch([sm2Text, sm2Mode], () => computeSm2())
 
@@ -87,13 +107,14 @@ async function genRsaKeys() {
 }
 
 async function computeRsa() {
-  if (!rsaText.value) { rsaResult.value = ''; rsaError.value = ''; return }
-  if (isTooLong(rsaText.value, MAX_ASYMMETRIC_CHARS)) { rsaResult.value = ''; rsaError.value = '输入过长'; return }
+  const isCurrent = latestRsa.next()
+  if (!rsaText.value) { rsaResult.value = ''; rsaError.value = ''; rsaLoading.value = false; return }
+  if (isTooLong(rsaText.value, MAX_ASYMMETRIC_CHARS)) { rsaResult.value = ''; rsaError.value = '输入过长'; rsaLoading.value = false; return }
   rsaLoading.value = true; rsaError.value = ''
   const lease = await rsaWorkerPool.acquire()
-  try { rsaResult.value = await lease.send<string>({ type: 'crypt', text: rsaText.value, pub: rsaPubKey.value, pri: rsaPriKey.value, mode: rsaMode.value }) }
-  catch (e: any) { rsaError.value = e?.message || 'RSA 操作失败'; rsaResult.value = '' }
-  finally { rsaLoading.value = false; lease.release() }
+  try { const result = await lease.send<string>({ type: 'crypt', text: rsaText.value, pub: rsaPubKey.value, pri: rsaPriKey.value, mode: rsaMode.value }); if (isCurrent()) rsaResult.value = result }
+  catch (e: any) { if (isCurrent()) { rsaError.value = e?.message || 'RSA 操作失败'; rsaResult.value = '' } }
+  finally { if (isCurrent()) rsaLoading.value = false; lease.release() }
 }
 watch([rsaText, rsaMode], () => computeRsa())
 
@@ -108,17 +129,18 @@ function saveJwtHistory() { if (!jwtText.value.trim()) return; jwtHistory.add({ 
 function onJwtHistorySelect(item: { data: { text: string; secret: string; mode: string } }) { jwtText.value = item.data.text; jwtSecret.value = item.data.secret; jwtMode.value = item.data.mode as any }
 
 async function computeJwt() {
+  const isCurrent = latestJwt.next()
   if (!jwtText.value || !jwtSecret.value) { jwtResult.value = ''; jwtError.value = ''; return }
   jwtError.value = ''
   if (jwtMode.value === 'encode') {
     const lease = await cryptoWorkerPool.acquire()
-    try { jwtResult.value = await lease.send<string>({ type: 'jwt-sign', text: jwtText.value, secret: jwtSecret.value }) }
-    catch (e: any) { jwtError.value = e?.message || '签名失败'; jwtResult.value = '' }
+    try { const result = await lease.send<string>({ type: 'jwt-sign', text: jwtText.value, secret: jwtSecret.value }); if (isCurrent()) jwtResult.value = result }
+    catch (e: any) { if (isCurrent()) { jwtError.value = e?.message || '签名失败'; jwtResult.value = '' } }
     finally { lease.release() }
   } else {
     const lease = await cryptoWorkerPool.acquire()
-    try { jwtResult.value = JSON.stringify(await lease.send<any>({ type: 'jwt-verify', token: jwtText.value, secret: jwtSecret.value }), null, 2) }
-    catch (e: any) { jwtError.value = e?.message || '验证失败'; jwtResult.value = '' }
+    try { const result = JSON.stringify(await lease.send<any>({ type: 'jwt-verify', token: jwtText.value, secret: jwtSecret.value }), null, 2); if (isCurrent()) jwtResult.value = result }
+    catch (e: any) { if (isCurrent()) { jwtError.value = e?.message || '验证失败'; jwtResult.value = '' } }
     finally { lease.release() }
   }
 }
@@ -130,12 +152,13 @@ const bcryptHash = ref(''), bcryptError = ref(''), bcryptLoading = ref(false)
 const bcryptCompare = ref(''), bcryptResult = ref('')
 
 async function computeBcrypt() {
-  if (!bcryptText.value) { bcryptHash.value = ''; bcryptError.value = ''; return }
+  const isCurrent = latestBcrypt.next()
+  if (!bcryptText.value) { bcryptHash.value = ''; bcryptError.value = ''; bcryptLoading.value = false; return }
   bcryptLoading.value = true; bcryptError.value = ''
   const lease = await cryptoWorkerPool.acquire()
-  try { bcryptHash.value = await lease.send<string>({ type: 'bcrypt-hash', text: bcryptText.value }) }
-  catch (e: any) { bcryptError.value = e?.message || '计算失败'; bcryptHash.value = '' }
-  finally { bcryptLoading.value = false; lease.release() }
+  try { const result = await lease.send<string>({ type: 'bcrypt-hash', text: bcryptText.value }); if (isCurrent()) bcryptHash.value = result }
+  catch (e: any) { if (isCurrent()) { bcryptError.value = e?.message || '计算失败'; bcryptHash.value = '' } }
+  finally { if (isCurrent()) bcryptLoading.value = false; lease.release() }
 }
 
 async function verifyBcrypt() {
@@ -160,12 +183,13 @@ function saveSm4History() { if (!sm4Text.value.trim()) return; sm4History.add({ 
 function onSm4HistorySelect(item: { data: { text: string; key: string; mode: string } }) { sm4Text.value = item.data.text; sm4Key.value = item.data.key; sm4Mode.value = item.data.mode as any }
 
 async function computeSm4() {
+  const isCurrent = latestSm4.next()
   if (!sm4Text.value || !sm4Key.value) { sm4Result.value = ''; sm4Error.value = ''; return }
   if (isTooLong(sm4Text.value, MAX_TEXT_CRYPTO_CHARS)) { sm4Result.value = ''; sm4Error.value = '输入过长'; return }
   sm4Error.value = ''
   const lease = await cryptoWorkerPool.acquire()
-  try { sm4Result.value = await lease.send<string>({ type: 'sm4', text: sm4Text.value, key: sm4Key.value, mode: sm4Mode.value }) }
-  catch (e: any) { sm4Error.value = e?.message || 'SM4 操作失败'; sm4Result.value = '' }
+  try { const result = await lease.send<string>({ type: 'sm4', text: sm4Text.value, key: sm4Key.value, mode: sm4Mode.value }); if (isCurrent()) sm4Result.value = result }
+  catch (e: any) { if (isCurrent()) { sm4Error.value = e?.message || 'SM4 操作失败'; sm4Result.value = '' } }
   finally { lease.release() }
 }
 watch([sm4Text, sm4Key, sm4Mode], () => computeSm4(), { immediate: true })

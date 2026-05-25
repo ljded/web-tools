@@ -6,10 +6,12 @@
 
 - 本地优先：文本、加密、图片、PDF 等处理逻辑在浏览器端完成。
 - 离线可用：通过 `vite-plugin-pwa` 和 Workbox 生成 Service Worker，首次加载后可离线回访。
+- Apple HIG 风格细化：统一层级背景、圆角、阴影、模糊和焦点反馈，提升整体一致性与可读性。
 - 统一界面：工具页使用 `ToolLayout`、`ToolHeader`、`ToolCard`、`ResultPanel`、`FileDropZone` 等共享组件。
 - Nuxt UI v4：使用 `@nuxt/ui/vite` + Vue plugin，组件自动导入，颜色使用语义 token。
 - 深色模式：由 Nuxt UI color mode 支持，布局与 Monaco 编辑器同步主题。
 - 国际化：业务文案使用 `vue-i18n`，Nuxt UI 内置组件文案通过 `UApp :locale` 配置。
+- 历史与收藏：支持 Recent/Favorite 工具入口，使用 localStorage 持久化偏好。
 - 历史记录：工具历史使用 IndexedDB 持久化，避免 localStorage 容量限制。
 - Worker 计算池：哈希、加密、密钥生成等重任务通过 Worker 执行，降低主线程阻塞。
 
@@ -22,13 +24,27 @@
 | 开发工具 | JSON 编辑器 | `/json` | 格式化、压缩、转义、JWT 解析、树形预览 |
 | 开发工具 | 时间戳工具 | `/timestamp` | 实时时间戳、日期转换、时区计算、日期差值 |
 | 开发工具 | 随机数据生成 | `/random` | 手机号、身份证号、UUID、密码、姓名、地址等假数据 |
+| 开发工具 | 记分牌 | `/scoreboard` | 双队比分记录、交换队伍、按步进快速加减分 |
+| 开发工具 | 计时器 | `/timer` | 本地倒计时，支持快捷时长、暂停和重置 |
+| 开发工具 | 番茄钟 | `/pomodoro` | 工作/休息循环计时，记录完成轮次 |
+| 开发工具 | 随机抽取 | `/picker` | 按行候选项随机抽取，支持不重复批量抽取 |
+| 开发工具 | 计算器 | `/calculator` | 基础四则表达式计算 |
+| 开发工具 | 单位换算 | `/unit` | 长度、重量、温度单位互转 |
+| 开发工具 | BMI 计算器 | `/bmi` | 根据身高体重计算 BMI 与评估区间 |
+| 开发工具 | 进制转换 | `/base` | 2 到 36 进制数字互转 |
+| 开发工具 | Markdown 编辑器 | `/markdown` | Monaco 本地编辑和实时预览 |
+| 开发工具 | JS 沙盒 | `/js-sandbox` | 在浏览器 Worker 中运行 JavaScript 片段并查看日志 |
+| 开发工具 | Cron 解析 | `/cron` | 解析 5 段 Cron 表达式并预览未来触发时间 |
 | 开发工具 | 颜色工具 | `/color` | Hex、RGB、HSL 格式转换，支持取色器能力 |
 | 文本工具 | Base64 工具 | `/base64` | 文本与文件 Base64 编码、解码、图片预览 |
 | 文本工具 | 编码转换 | `/encoding` | URL、HTML Entity、Unicode、GBK、Base64 等转换 |
 | 文本工具 | 正则工具 | `/regex` | 正则匹配、替换、分割和高亮结果 |
 | 文本工具 | 对比工具 | `/diff` | 文本 Diff 与图片并排/叠加对比 |
+| 文本工具 | 字符串工具 | `/string` | 大小写转换、命名风格转换、行去重/排序/反转 |
+| 文本工具 | 莫斯电码 | `/morse` | 文本与莫斯码互转 |
+| 文本工具 | 大文本处理 | `/bigtext` | 大文本统计、去重、排序与分块 |
 | 媒体工具 | 二维码工具 | `/qrcode` | 二维码生成、上传解析、Base64/Data URL 解析 |
-| 媒体工具 | 图片工具 | `/image` | 压缩、格式转换、缩放、水印、旋转、裁剪 |
+| 媒体工具 | 图片工具 | `/image` | 压缩、格式转换、缩放、水印、旋转、裁剪、幻影坦克、图片拼接、元数据清理、GIF、轻量可视编辑 |
 | 媒体工具 | PDF 工具 | `/pdf` | 压缩、合并、拆分、水印、转图片 |
 
 ## 技术栈
@@ -105,6 +121,56 @@ src/
     text/                 # 文本类工具
   workers/                # Worker 和 Worker pool
 ```
+
+## 快速修改指南（建议先看）
+
+### 1) 想快速改整体风格
+优先改这几个文件：
+
+- `src/style.css`：全局背景、玻璃层、焦点环（`hig-focus`）
+- `src/app/AppShell.vue`：主布局、通知条、移动端侧滑样式
+- `src/app/AppHeader.vue`：顶部栏密度、搜索入口、主题/语言切换
+- `src/app/AppSidebar.vue`：导航结构与收藏区
+- `src/app/AppCommandPalette.vue`：命令面板层级和信息密度
+
+建议原则：
+
+- 只用语义色：`bg-elevated` / `text-muted` / `border-default` 等
+- 先改共享组件，再改具体工具页
+- 不要在工具页重复造样式，优先通过 `ToolCard/ToolHeader/ResultPanel` 统一
+
+### 2) 想新增一个工具
+最小路径：
+
+1. 新建页面：`src/views/<domain>/<Tool>.vue`
+2. 注册工具：`src/tools/registry.ts`
+3. 补充文案：`src/i18n/locales/zh-CN.ts` 与 `src/i18n/locales/en-US.ts`
+4. 若是重计算任务：在 `src/workers/` 增加或复用 worker
+5. 运行校验：`npm run type-check && npm run test && npm run build`
+
+### 3) 想加“入口体验功能”（收藏/最近使用）
+当前已实现：
+
+- Recent：`web-tools:recent-tools`
+- Favorite：`web-tools:favorite-tools`
+
+相关文件：
+
+- `src/app/AppShell.vue`（记录最近访问）
+- `src/app/AppSidebar.vue`（收藏入口）
+- `src/app/AppCommandPalette.vue`（最近使用分组）
+- `src/views/Home.vue`（收藏与最近模块）
+- `src/tools/navigation.ts`（收藏导航项派生）
+
+### 4) Crypto 工具的 worker 协议注意点
+`Crypto.vue` 与 worker 指令已对齐，后续扩展请保持调用名一致：
+
+- `jwt-sign` / `jwt-verify` -> `src/workers/crypto.worker.ts`
+- `bcrypt-verify` -> `src/workers/crypto.worker.ts`
+- `crypt`（RSA）-> `src/workers/rsa.worker.ts`
+- `sm2` 支持 `pubKey/priKey` 与 `pub/pri` 兼容字段
+
+---
 
 ## UI 规范
 
@@ -212,7 +278,7 @@ npm run test:e2e
 |---|---|
 | `tools-crypto` | 哈希、加解密 |
 | `tools-media` | 二维码、图片、PDF |
-| `tools-text` | Base64、编码、正则、对比 |
+| `tools-text` | Base64、编码、正则、对比、字符串工具 |
 | `tools-dev` | JSON、时间戳、随机数据、颜色 |
 | `vendor-monaco` | Monaco Editor |
 
@@ -224,4 +290,5 @@ npm run test:e2e
 2. 使用 `ToolPage`、`ToolSection`、`ResultPanel` 等共享组件保持视觉统一；复杂页面可继续组合底层 `ToolLayout`、`ToolHeader`、`ToolCard`。
 3. 在 `src/tools/registry.ts` 中注册工具定义，包括 `name`、`path`、`i18nKey`、`domain`、`icon`、`color`、`component`、`keywords`、`tags`、`capabilities`。
 4. 在 `src/i18n/` 中补充业务文案。
-5. 运行 `npm run type-check`、`npm run test`、`npm run build` 验证。
+5. 如果涉及 worker，确保“页面调用命令名”和“worker switch 分支命令名”完全一致。
+6. 运行 `npm run type-check`、`npm run test`、`npm run build` 验证。

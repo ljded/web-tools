@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { degrees, PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { onUnmounted, ref } from 'vue'
 import * as pdfjsLib from 'pdfjs-dist'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url'
 import { usePersistedRef } from '@/utils/persist'
+import PdfWorker from '@/workers/pdf.worker?worker'
+import { createWorkerPool } from '@/workers/pool'
 import FileDropZone from '@/components/FileDropZone.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 const toast = useToast()
+const pdfWorkerPool = createWorkerPool(() => new PdfWorker(), { size: 1 })
+const MAX_PDF_BYTES = 100 * 1024 * 1024
+const MAX_TO_IMAGE_PAGES = 30
+const MAX_TO_IMAGE_DPI = 300
 
 const activeTab = usePersistedRef<'compress' | 'merge' | 'split' | 'watermark' | 'toImage'>('web-tools:pdf:tab', 'compress')
 
@@ -18,54 +23,44 @@ const compressFile = ref<File | null>(null)
 const compressLevel = usePersistedRef<'light' | 'medium' | 'strong'>('web-tools:pdf:compress-level', 'medium')
 const compressLoading = ref(false)
 
-function handleCompressFile(e: Event) {
-  const file = (e.target as HTMLInputElement).files?.[0]
-  if (file) setCompressFile(file)
-}
 function isPdfFile(file: File): boolean {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
 }
+function canUsePdf(file: File): boolean {
+  if (!isPdfFile(file)) return false
+  if (file.size <= MAX_PDF_BYTES) return true
+  toast.add({ title: 'PDF 文件过大', description: '请使用 100MB 以内的 PDF 文件。', color: 'warning' })
+  return false
+}
 function setCompressFile(file: File) {
-  if (isPdfFile(file)) compressFile.value = file
+  if (canUsePdf(file)) compressFile.value = file
 }
 function onCompressFiles(files: File[]) {
   const [file] = files
-  if (file) setCompressFile(file)
-}
-function handleCompressDrop(e: DragEvent) {
-  e.preventDefault()
-  const file = e.dataTransfer?.files?.[0]
   if (file) setCompressFile(file)
 }
 
 async function doCompress() {
   if (!compressFile.value) return
   compressLoading.value = true
+  const lease = await pdfWorkerPool.acquire()
   try {
     const bytes = await compressFile.value.arrayBuffer()
-    const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false })
-    const objectStreams = compressLevel.value !== 'light'
-    const out = await doc.save({ useObjectStreams: objectStreams, addDefaultPage: false, objectsPerTick: compressLevel.value === 'strong' ? 200 : 50 })
+    const out = await lease.send<ArrayBuffer>({ type: 'compress', bytes, level: compressLevel.value }, { transfer: [bytes], timeout: 0 })
     const baseName = compressFile.value.name.replace(/\.pdf$/i, '') || 'document'
     downloadBlob(pdfBytesToBlob(out), `${baseName}_compressed.pdf`)
   } catch (e: any) { toast.add({ title: '压缩失败', description: e.message || String(e), color: 'error' }) }
-  finally { compressLoading.value = false }
+  finally { lease.release(); compressLoading.value = false }
 }
 
 // PDF 合并
 const mergeFiles = ref<{ file: File; name: string }[]>([])
 const mergeLoading = ref(false)
 
-function triggerMergeUpload() {
-  const el = document.getElementById('pdf-merge-upload') as HTMLInputElement | null
-  if (el) el.value = ''; el?.click()
-}
-function handleMergeFiles(e: Event) { addMergeFiles(Array.from((e.target as HTMLInputElement).files || [])) }
 function addMergeFiles(files: File[]) {
-  const valid = files.filter(isPdfFile)
+  const valid = files.filter(canUsePdf)
   mergeFiles.value.push(...valid.map((f) => ({ file: f, name: f.name })))
 }
-function handleMergeDrop(e: DragEvent) { e.preventDefault(); addMergeFiles(Array.from(e.dataTransfer?.files || [])) }
 function removeMergeFile(idx: number) { mergeFiles.value.splice(idx, 1) }
 function moveMergeFile(idx: number, dir: -1 | 1) {
   const newIdx = idx + dir
@@ -76,17 +71,13 @@ function moveMergeFile(idx: number, dir: -1 | 1) {
 async function doMerge() {
   if (!mergeFiles.value.length) return
   mergeLoading.value = true
+  const lease = await pdfWorkerPool.acquire()
   try {
-    const merged = await PDFDocument.create()
-    for (const item of mergeFiles.value) {
-      const bytes = await item.file.arrayBuffer()
-      const doc = await PDFDocument.load(bytes)
-      const pages = await merged.copyPages(doc, doc.getPageIndices())
-      pages.forEach((p) => merged.addPage(p))
-    }
-    const bytes = await merged.save(); downloadBlob(pdfBytesToBlob(bytes), 'merged.pdf')
+    const files = await Promise.all(mergeFiles.value.map((item) => item.file.arrayBuffer()))
+    const bytes = await lease.send<ArrayBuffer>({ type: 'merge', files }, { transfer: files, timeout: 0 })
+    downloadBlob(pdfBytesToBlob(bytes), 'merged.pdf')
   } catch (e: any) { toast.add({ title: '合并失败', description: e.message || String(e), color: 'error' }) }
-  finally { mergeLoading.value = false }
+  finally { lease.release(); mergeLoading.value = false }
 }
 
 // PDF 拆分
@@ -94,47 +85,24 @@ const splitFile = ref<File | null>(null)
 const splitRanges = usePersistedRef('web-tools:pdf:split-ranges', '1-3,5')
 const splitLoading = ref(false)
 
-function handleSplitFile(e: Event) { const file = (e.target as HTMLInputElement).files?.[0]; if (file) setSplitFile(file) }
-function setSplitFile(file: File) { if (isPdfFile(file)) splitFile.value = file }
+function setSplitFile(file: File) { if (canUsePdf(file)) splitFile.value = file }
 function onSplitFiles(files: File[]) {
   const [file] = files
   if (file) setSplitFile(file)
-}
-function handleSplitDrop(e: DragEvent) { e.preventDefault(); const file = e.dataTransfer?.files?.[0]; if (file) setSplitFile(file) }
-
-function parseRanges(input: string, total: number): number[][] {
-  const groups: number[][] = []
-  const parts = input.split(',').map((s) => s.trim())
-  for (const part of parts) {
-    if (!part) continue
-    const [startStr, endStr] = part.split('-')
-    const start = Math.max(1, parseInt(startStr || ''))
-    const end = endStr ? Math.min(total, parseInt(endStr)) : start
-    if (isNaN(start) || start > total) continue
-    const pages: number[] = []
-    for (let i = start; i <= end; i++) pages.push(i - 1)
-    if (pages.length) groups.push(pages)
-  }
-  return groups
 }
 
 async function doSplit() {
   if (!splitFile.value) return
   splitLoading.value = true
+  const lease = await pdfWorkerPool.acquire()
   try {
     const bytes = await splitFile.value.arrayBuffer()
-    const doc = await PDFDocument.load(bytes)
-    const total = doc.getPageCount()
-    const groups = parseRanges(splitRanges.value, total)
-    if (!groups.length) { toast.add({ title: '页码范围格式错误', color: 'warning' }); return }
-    for (let i = 0; i < groups.length; i++) {
-      const newDoc = await PDFDocument.create()
-      const pages = await newDoc.copyPages(doc, groups[i]!)
-      pages.forEach((p) => newDoc.addPage(p))
-      const out = await newDoc.save(); downloadBlob(pdfBytesToBlob(out), `split_${i + 1}.pdf`)
+    const files = await lease.send<Array<{ name: string; bytes: ArrayBuffer }>>({ type: 'split', bytes, ranges: splitRanges.value }, { transfer: [bytes], timeout: 0 })
+    for (const file of files) {
+      downloadBlob(pdfBytesToBlob(file.bytes), file.name)
     }
   } catch (e: any) { toast.add({ title: '拆分失败', description: e.message || String(e), color: 'error' }) }
-  finally { splitLoading.value = false }
+  finally { lease.release(); splitLoading.value = false }
 }
 
 // PDF 水印
@@ -144,41 +112,22 @@ const wmColor = usePersistedRef('web-tools:pdf:wm-color', '#ff0000')
 const wmSize = usePersistedRef('web-tools:pdf:wm-size', 48)
 const wmLoading = ref(false)
 
-function handleWmFile(e: Event) { const file = (e.target as HTMLInputElement).files?.[0]; if (file) setWmFile(file) }
-function setWmFile(file: File) { if (isPdfFile(file)) wmFile.value = file }
+function setWmFile(file: File) { if (canUsePdf(file)) wmFile.value = file }
 function onWmFiles(files: File[]) {
   const [file] = files
   if (file) setWmFile(file)
-}
-function handleWmDrop(e: DragEvent) { e.preventDefault(); const file = e.dataTransfer?.files?.[0]; if (file) setWmFile(file) }
-
-function hexToRgbTuple(hex: string) {
-  const clean = hex.replace('#', '')
-  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean.slice(0, 6)
-  const num = parseInt(full, 16)
-  return { r: ((num >> 16) & 255) / 255, g: ((num >> 8) & 255) / 255, b: (num & 255) / 255 }
 }
 
 async function doWatermark() {
   if (!wmFile.value) return
   wmLoading.value = true
+  const lease = await pdfWorkerPool.acquire()
   try {
     const bytes = await wmFile.value.arrayBuffer()
-    const doc = await PDFDocument.load(bytes)
-    const pages = doc.getPages()
-    const font = await doc.embedFont(StandardFonts.Helvetica)
-    const color = hexToRgbTuple(wmColor.value)
-    for (const page of pages) {
-      const { width, height } = page.getSize()
-      page.drawText(wmText.value, {
-        x: width / 2 - (wmText.value.length * wmSize.value * 0.3),
-        y: height / 2, size: wmSize.value, font,
-        color: rgb(color.r, color.g, color.b), opacity: 0.3, rotate: degrees(-45),
-      })
-    }
-    const out = await doc.save(); downloadBlob(pdfBytesToBlob(out), 'watermarked.pdf')
+    const out = await lease.send<ArrayBuffer>({ type: 'watermark', bytes, text: wmText.value, color: wmColor.value, size: wmSize.value }, { transfer: [bytes], timeout: 0 })
+    downloadBlob(pdfBytesToBlob(out), 'watermarked.pdf')
   } catch (e: any) { toast.add({ title: '添加水印失败', description: e.message || String(e), color: 'error' }) }
-  finally { wmLoading.value = false }
+  finally { lease.release(); wmLoading.value = false }
 }
 
 // PDF 转图片
@@ -187,16 +136,19 @@ const tiDpi = usePersistedRef('web-tools:pdf:ti-dpi', 150)
 const tiLoading = ref(false)
 const tiResults = ref<{ url: string; idx: number }[]>([])
 
-function handleTiFile(e: Event) { const file = (e.target as HTMLInputElement).files?.[0]; if (file) setTiFile(file) }
+function clearTiResults() {
+  tiResults.value.forEach((r) => URL.revokeObjectURL(r.url))
+  tiResults.value = []
+}
 function setTiFile(file: File) {
-  if (!isPdfFile(file)) return
-  tiFile.value = file; tiResults.value.forEach((r) => URL.revokeObjectURL(r.url)); tiResults.value = []
+  if (!canUsePdf(file)) return
+  tiFile.value = file
+  clearTiResults()
 }
 function onTiFiles(files: File[]) {
   const [file] = files
   if (file) setTiFile(file)
 }
-function handleTiDrop(e: DragEvent) { e.preventDefault(); const file = e.dataTransfer?.files?.[0]; if (file) setTiFile(file) }
 
 async function doToImage() {
   if (!tiFile.value) return
@@ -204,7 +156,12 @@ async function doToImage() {
   try {
     const bytes = await tiFile.value.arrayBuffer()
     const pdf = await pdfjsLib.getDocument({ data: bytes }).promise
-    const scale = tiDpi.value / 72
+    if (pdf.numPages > MAX_TO_IMAGE_PAGES) {
+      toast.add({ title: '页数过多', description: `单次最多转换 ${MAX_TO_IMAGE_PAGES} 页。`, color: 'warning' })
+      return
+    }
+    const dpi = Math.min(tiDpi.value, MAX_TO_IMAGE_DPI)
+    const scale = dpi / 72
     const results: { url: string; idx: number }[] = []
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i)
@@ -218,18 +175,25 @@ async function doToImage() {
       })
       results.push({ url: URL.createObjectURL(blob), idx: i })
     }
+    clearTiResults()
     tiResults.value = results
   } catch (e: any) { toast.add({ title: '转换失败', description: e.message || String(e), color: 'error' }) }
   finally { tiLoading.value = false }
 }
+
+onUnmounted(() => {
+  clearTiResults()
+  pdfWorkerPool.terminate()
+})
 
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a'); link.download = filename; link.href = url; link.click()
   URL.revokeObjectURL(url)
 }
-function pdfBytesToBlob(bytes: Uint8Array) {
-  return new Blob([bytes.slice().buffer], { type: 'application/pdf' })
+function pdfBytesToBlob(bytes: ArrayBuffer | Uint8Array) {
+  const buffer = bytes instanceof Uint8Array ? bytes.slice().buffer : bytes
+  return new Blob([buffer], { type: 'application/pdf' })
 }
 
 const tabItems = [
@@ -249,7 +213,9 @@ const tabItems = [
     <ToolSection v-if="activeTab === 'compress'">
       <div class="space-y-4">
         <FileDropZone accept=".pdf" title="选择 PDF" hint="或拖拽 PDF 到此处" @files="onCompressFiles" />
-        <USelect v-model="compressLevel" :items="[{ label: '轻度', value: 'light' }, { label: '中等', value: 'medium' }, { label: '强力', value: 'strong' }]" label="压缩级别" />
+        <UFormField label="压缩级别">
+          <USelect v-model="compressLevel" :items="[{ label: '轻度', value: 'light' }, { label: '中等', value: 'medium' }, { label: '强力', value: 'strong' }]" />
+        </UFormField>
         <UButton color="primary" @click="doCompress" :disabled="!compressFile || compressLoading" class="rounded-full px-5 py-2.5 text-sm">
           <template #leading><UIcon name="i-lucide-minimize-2" class="size-4" /></template>
           {{ compressLoading ? '压缩中...' : '压缩并下载' }}
@@ -262,7 +228,7 @@ const tabItems = [
       <div class="space-y-4">
         <FileDropZone accept=".pdf" multiple title="选择 PDF" hint="或拖拽 PDF 到此处（可多选）" @files="addMergeFiles" />
         <div v-if="mergeFiles.length" class="space-y-2">
-          <div v-for="(item, i) in mergeFiles" :key="i" class="flex items-center justify-between rounded-xl bg-elevated px-4 py-2">
+          <div v-for="(item, i) in mergeFiles" :key="i" class="flex items-center justify-between rounded-2xl border border-default/70 bg-default/50 px-4 py-3 shadow-sm">
             <span class="text-sm text-default">{{ item.name }}</span>
             <div class="flex gap-1">
               <UButton color="neutral" variant="ghost" icon="i-lucide-chevron-up" size="xs" @click="moveMergeFile(i, -1)" :disabled="i === 0" class="rounded-full" />
@@ -317,13 +283,13 @@ const tabItems = [
       <div class="space-y-4">
         <FileDropZone accept=".pdf" title="选择 PDF" hint="或拖拽 PDF 到此处" @files="onTiFiles" />
         <UFormField :label="`DPI: ${tiDpi}`">
-          <USlider v-model="tiDpi" :min="72" :max="600" :step="1" />
+          <USlider v-model="tiDpi" :min="72" :max="MAX_TO_IMAGE_DPI" :step="1" />
         </UFormField>
         <UButton color="primary" @click="doToImage" :disabled="!tiFile || tiLoading" class="rounded-full px-5 py-2.5 text-sm">
           {{ tiLoading ? '转换中...' : '转换为图片' }}
         </UButton>
         <div v-if="tiResults.length" class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div v-for="r in tiResults" :key="r.idx" class="relative rounded-xl overflow-hidden border border-default">
+          <div v-for="r in tiResults" :key="r.idx" class="relative overflow-hidden rounded-2xl border border-default/70 bg-default/50 shadow-sm">
             <img :src="r.url" class="w-full" />
             <span class="absolute bottom-1 left-1 rounded bg-inverted/80 px-1.5 py-0.5 text-xs text-inverted">第 {{ r.idx }} 页</span>
           </div>

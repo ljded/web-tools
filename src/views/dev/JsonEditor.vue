@@ -11,6 +11,7 @@ import ToolSection from '@/components/tool/ToolSection.vue'
 const { input, history, saveHistory } = useToolState<string, { input: string }>({
   storageKey: 'json',
   defaultInput: '',
+  getHistoryData: (value) => ({ input: value }),
   historyOptions: {
     maxCount: 15,
     generateLabel: (d) => d.input.replace(/\s+/g, ' ').slice(0, 50) + (d.input.length > 50 ? '...' : ''),

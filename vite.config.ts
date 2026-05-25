@@ -25,7 +25,7 @@ export default defineConfig({
     tailwindcss(),
     vueDevTools(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifest: {
         name: 'Web Tools',
         short_name: 'Web Tools',
