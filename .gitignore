@@ -39,4 +39,5 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 /Python/
-/.agents
+/.claude
+/.kilo/

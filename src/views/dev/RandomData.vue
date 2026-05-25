@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import CopyBtn from '@/components/CopyBtn.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 
 function randomInt(min: number, max: number) { return Math.floor(Math.random() * (max - min + 1)) + min }
 
@@ -79,18 +78,16 @@ function generateAll() {
 </script>
 
 <template>
-  <ToolLayout max-width="5xl">
-    <ToolHeader title="随机数据生成" description="一键生成手机号、身份证、UUID、密码等常用测试数据" icon="i-lucide-dices">
-      <template #actions>
-        <UButton color="primary" variant="soft" icon="i-lucide-refresh-cw" @click="generateAll">
-          全部生成
-        </UButton>
-      </template>
-    </ToolHeader>
+  <ToolPage name="random" max-width="5xl" icon="i-lucide-dices">
+    <template #actions>
+      <UButton color="primary" variant="soft" icon="i-lucide-refresh-cw" @click="generateAll">
+        全部生成
+      </UButton>
+    </template>
 
-    <ToolCard compact>
+    <ToolSection compact>
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ToolCard v-for="g in generators" :key="g.key" compact>
+        <ToolSection v-for="g in generators" :key="g.key" compact>
           <div class="mb-3 flex items-center justify-between">
             <span class="text-sm font-medium text-default">{{ g.label }}</span>
             <UButton color="neutral" variant="ghost" icon="i-lucide-refresh-cw" @click="generate(g.key)" :disabled="loading[g.key]" class="rounded-full" :class="loading[g.key] ? 'animate-spin' : ''" size="xs" />
@@ -99,8 +96,8 @@ function generateAll() {
             <div class="flex-1 truncate rounded-xl bg-elevated px-3 py-2 font-mono text-sm text-default">{{ results[g.key] || '-' }}</div>
             <CopyBtn v-if="results[g.key] && results[g.key] !== '生成失败'" :text="results[g.key]!" />
           </div>
-        </ToolCard>
+        </ToolSection>
       </div>
-    </ToolCard>
-  </ToolLayout>
+    </ToolSection>
+  </ToolPage>
 </template>

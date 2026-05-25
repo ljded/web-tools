@@ -6,6 +6,7 @@ export interface ToolStateOptions<TInput, THistory extends Record<string, unknow
   storageKey: string
   defaultInput: TInput
   historyOptions?: UseHistoryOptions<THistory>
+  getHistoryData?: (input: TInput) => THistory | null | undefined
 }
 
 export interface ToolState<TInput, THistory extends Record<string, unknown>> {
@@ -22,7 +23,7 @@ export interface ToolState<TInput, THistory extends Record<string, unknown>> {
 export function useToolState<TInput, THistory extends Record<string, unknown>>(
   options: ToolStateOptions<TInput, THistory>,
 ): ToolState<TInput, THistory> {
-  const { storageKey, defaultInput, historyOptions } = options
+  const { storageKey, defaultInput, historyOptions, getHistoryData } = options
 
   const input = usePersistedRef<TInput>(`web-tools:${storageKey}:input`, defaultInput)
   const isProcessing = ref(false)
@@ -34,9 +35,14 @@ export function useToolState<TInput, THistory extends Record<string, unknown>>(
   })
 
   function saveHistory() {
-    const data = input.value
-    if (typeof data === 'string' ? !data.trim() : !data) return
-    history.add(data as unknown as THistory)
+    if (typeof input.value === 'string' && !input.value.trim()) return
+
+    const data = getHistoryData
+      ? getHistoryData(input.value)
+      : (input.value as unknown as THistory)
+
+    if (!data) return
+    history.add(data)
   }
 
   function setError(msg: string) {

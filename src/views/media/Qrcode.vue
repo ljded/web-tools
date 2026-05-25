@@ -3,12 +3,11 @@ import { ref, watch, nextTick } from 'vue'
 import QRCode from 'qrcode'
 import jsQR from 'jsqr'
 import { useToolState } from '@/composables'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import FileDropZone from '@/components/FileDropZone.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
 
 const activeTab = usePersistedRef<'generate' | 'parse'>('web-tools:qrcode:tab', 'generate')
@@ -16,6 +15,7 @@ const activeTab = usePersistedRef<'generate' | 'parse'>('web-tools:qrcode:tab', 
 const { input: text, history: genHistory, saveHistory: saveGenHistory } = useToolState<string, { text: string }>({
   storageKey: 'qrcode:gen',
   defaultInput: 'Web Tools - 本地离线工具集',
+  getHistoryData: (value) => ({ text: value }),
   historyOptions: {
     maxCount: 10,
     generateLabel: (d) => d.text.slice(0, 40) + (d.text.length > 40 ? '...' : ''),
@@ -25,6 +25,7 @@ const { input: text, history: genHistory, saveHistory: saveGenHistory } = useToo
 const { input: parseInput, history: parseHistory, saveHistory: saveParseHistory } = useToolState<string, { input: string }>({
   storageKey: 'qrcode:parse',
   defaultInput: '',
+  getHistoryData: (value) => ({ input: value }),
   historyOptions: {
     maxCount: 10,
     generateLabel: (d) => d.input.slice(0, 40) + (d.input.length > 40 ? '...' : ''),
@@ -134,9 +135,7 @@ function parseFromInput() {
 </script>
 
 <template>
-  <ToolLayout max-width="3xl">
-    <ToolHeader title="二维码工具" description="生成与解析二维码图片" icon="i-lucide-qr-code" />
-
+  <ToolPage name="qrcode" max-width="3xl">
     <UTabs
       v-model="activeTab"
       :items="[
@@ -147,7 +146,7 @@ function parseFromInput() {
 
     <!-- 生成 -->
     <div v-if="activeTab === 'generate'" class="space-y-5">
-      <ToolCard>
+      <ToolSection>
         <div class="space-y-5">
           <div class="space-y-2">
             <div class="flex items-center justify-between">
@@ -179,12 +178,12 @@ function parseFromInput() {
 
           <UButton color="primary" icon="i-lucide-download" @click="download" class="rounded-full px-5 py-2.5 text-sm font-medium" :disabled="!text">下载 PNG</UButton>
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- 解析 -->
     <div v-if="activeTab === 'parse'" class="space-y-5">
-      <ToolCard>
+      <ToolSection>
         <div class="space-y-5">
           <div class="space-y-2">
             <div class="flex items-center justify-between">
@@ -210,7 +209,7 @@ function parseFromInput() {
 
           <ResultPanel v-if="parseResult" title="解析结果" :value="parseResult" />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
-  </ToolLayout>
+  </ToolPage>
 </template>

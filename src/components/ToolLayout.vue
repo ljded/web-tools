@@ -16,7 +16,7 @@ const widths: Record<string, string> = {
 </script>
 
 <template>
-  <UContainer :ui="{ base: `mx-auto space-y-6 pb-10 ${widths[maxWidth]}` }">
+  <UContainer :ui="{ base: `mx-auto space-y-7 pb-12 ${widths[maxWidth]}` }">
     <slot />
   </UContainer>
 </template>

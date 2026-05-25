@@ -2,10 +2,9 @@
 import { ref, watch } from 'vue'
 import { useToolState } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 import gbk from 'gbk.js'
 
 const MAX_ENCODING_CHARS = 500_000
@@ -17,6 +16,7 @@ const notice = ref('')
 const { input, history, saveHistory } = useToolState<string, { mode: 'to' | 'from'; input: string }>({
   storageKey: 'encoding',
   defaultInput: '你好，世界！Hello 🌍',
+  getHistoryData: (value) => ({ mode: mode.value, input: value }),
   historyOptions: {
     maxCount: 15,
     generateLabel: (d) => `[${d.mode === 'to' ? '编码' : '解码'}] ${d.input.slice(0, 40)}${d.input.length > 40 ? '...' : ''}`,
@@ -103,10 +103,8 @@ function getUtf16Hex(txt: string): string {
 </script>
 
 <template>
-  <ToolLayout max-width="3xl">
-    <ToolHeader title="编码转换" description="字符编码、URL、HTML Entity、Base64 与 GBK 转换" icon="i-lucide-languages" />
-
-    <ToolCard title="输入" description="选择转换方向后输入文本或编码内容。">
+  <ToolPage name="encoding" max-width="3xl" icon="i-lucide-languages">
+    <ToolSection title="输入" description="选择转换方向后输入文本或编码内容。">
       <template #actions>
         <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
       </template>
@@ -123,10 +121,10 @@ function getUtf16Hex(txt: string): string {
         class="w-full"
       />
       <UAlert v-if="notice" class="mt-3" color="warning" variant="soft" icon="i-lucide-triangle-alert" :description="notice" />
-    </ToolCard>
+    </ToolSection>
 
     <div class="space-y-3">
       <ResultPanel v-for="item in results" :key="item.name" :title="item.name" :value="item.value" />
     </div>
-  </ToolLayout>
+  </ToolPage>
 </template>

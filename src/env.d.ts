@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+/// <reference types="vite-plugin-pwa/client" />
 
 declare module 'sm-crypto' {
   export function sm3(input: string): string

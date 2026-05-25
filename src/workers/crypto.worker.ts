@@ -1,13 +1,18 @@
 import CryptoJS from 'crypto-js'
+import { SignJWT, jwtVerify } from 'jose'
 import { sm2, sm4 } from 'sm-crypto'
 import bcrypt from 'bcryptjs'
 
 type CryptoCommand =
+  | { type: 'ping' }
   | { type: 'aes'; text: string; key: string; mode: 'encrypt' | 'decrypt' }
-  | { type: 'sm2'; text: string; mode: 'encrypt' | 'decrypt' | 'sign' | 'verify'; pubKey?: string; priKey?: string }
+  | { type: 'sm2'; text: string; mode: 'encrypt' | 'decrypt' | 'sign' | 'verify'; pubKey?: string; priKey?: string; pub?: string; pri?: string }
   | { type: 'rsa'; text: string; mode: 'encrypt' | 'decrypt'; pubKey?: string; priKey?: string }
+  | { type: 'jwt-sign'; text: string; secret: string }
+  | { type: 'jwt-verify'; token: string; secret: string }
   | { type: 'bcrypt-hash'; text: string; rounds?: number }
   | { type: 'bcrypt-compare'; text: string; hash: string }
+  | { type: 'bcrypt-verify'; text: string; hash: string }
   | { type: 'sm4'; text: string; key: string; mode: 'encrypt' | 'decrypt' }
   | { type: 'sm2-gen-keys' }
 
@@ -24,10 +29,14 @@ function fail(id: string, error: unknown) {
   ctx.postMessage({ id, ok: false, error: error instanceof Error ? error.message : String(error) })
 }
 
-ctx.onmessage = (event) => {
+ctx.onmessage = async (event) => {
   const { id, payload } = event.data
   try {
     switch (payload.type) {
+      case 'ping': {
+        ok(id, { pong: true })
+        return
+      }
       case 'aes': {
         if (payload.mode === 'encrypt') {
           ok(id, CryptoJS.AES.encrypt(payload.text, payload.key).toString())
@@ -38,30 +47,51 @@ ctx.onmessage = (event) => {
         return
       }
       case 'sm2': {
+        const pubKey = payload.pubKey ?? payload.pub
+        const priKey = payload.priKey ?? payload.pri
         if (payload.mode === 'encrypt') {
-          if (!payload.pubKey) throw new Error('缺少公钥')
-          ok(id, sm2.doEncrypt(payload.text, payload.pubKey, 1))
+          if (!pubKey) throw new Error('缺少公钥')
+          ok(id, sm2.doEncrypt(payload.text, pubKey, 1))
         } else if (payload.mode === 'decrypt') {
-          if (!payload.priKey) throw new Error('缺少私钥')
-          ok(id, sm2.doDecrypt(payload.text, payload.priKey, 1) || '解密失败')
+          if (!priKey) throw new Error('缺少私钥')
+          ok(id, sm2.doDecrypt(payload.text, priKey, 1) || '解密失败')
         } else if (payload.mode === 'sign') {
-          if (!payload.priKey) throw new Error('缺少私钥')
-          ok(id, sm2.doSignature(payload.text, payload.priKey))
+          if (!priKey) throw new Error('缺少私钥')
+          ok(id, sm2.doSignature(payload.text, priKey))
         } else if (payload.mode === 'verify') {
-          if (!payload.pubKey) throw new Error('缺少公钥')
+          if (!pubKey) throw new Error('缺少公钥')
           const sig = payload.text.split('||')[1] || ''
           const msg = payload.text.split('||')[0] || ''
           if (!sig || !msg) throw new Error('格式：消息||签名')
-          const valid = sm2.doVerifySignature(msg, sig, payload.pubKey)
+          const valid = sm2.doVerifySignature(msg, sig, pubKey)
           ok(id, valid ? '✅ 签名验证通过' : '❌ 签名验证失败')
         }
         return
       }
       case 'rsa': {
-        // RSA encrypt/decrypt is fast enough for small text; keep in main thread or use JSEncrypt here if needed
-        // For consistency we support it, but in practice the main-thread JSEncrypt is acceptable for <4k chars.
-        // If we want to offload, we'd need to import jsencrypt in worker (may be heavy).
-        throw new Error('RSA 加解密建议在主线程执行，或单独使用 rsa.worker')
+        throw new Error('RSA 请使用 rsa.worker 执行')
+      }
+      case 'jwt-sign': {
+        const secret = new TextEncoder().encode(payload.secret)
+        let body: Record<string, unknown>
+        try {
+          const parsed = JSON.parse(payload.text)
+          body = typeof parsed === 'object' && parsed !== null ? parsed as Record<string, unknown> : { value: parsed }
+        } catch {
+          body = { value: payload.text }
+        }
+        const token = await new SignJWT(body)
+          .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+          .setIssuedAt()
+          .sign(secret)
+        ok(id, token)
+        return
+      }
+      case 'jwt-verify': {
+        const secret = new TextEncoder().encode(payload.secret)
+        const { payload: decodedPayload, protectedHeader } = await jwtVerify(payload.token, secret)
+        ok(id, { header: protectedHeader, payload: decodedPayload })
+        return
       }
       case 'bcrypt-hash': {
         ok(id, bcrypt.hashSync(payload.text, payload.rounds ?? 10))
@@ -69,6 +99,10 @@ ctx.onmessage = (event) => {
       }
       case 'bcrypt-compare': {
         ok(id, bcrypt.compareSync(payload.text, payload.hash) ? '密码匹配' : '密码不匹配')
+        return
+      }
+      case 'bcrypt-verify': {
+        ok(id, bcrypt.compareSync(payload.text, payload.hash))
         return
       }
       case 'sm4': {
@@ -86,7 +120,7 @@ ctx.onmessage = (event) => {
       }
       case 'sm2-gen-keys': {
         const keys = sm2.generateKeyPairHex()
-        ok(id, { publicKey: keys.publicKey, privateKey: keys.privateKey })
+        ok(id, { pub: keys.publicKey, pri: keys.privateKey })
         return
       }
       default:

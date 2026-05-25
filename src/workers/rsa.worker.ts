@@ -1,6 +1,8 @@
 import JSEncrypt from 'jsencrypt'
 
-type RsaCommand = { type: 'generate'; size?: number }
+type RsaCommand =
+  | { type: 'generate'; size?: number }
+  | { type: 'crypt'; text: string; mode: 'encrypt' | 'decrypt'; pub?: string; pri?: string }
 
 const ctx = self as unknown as {
   postMessage(message: unknown): void
@@ -18,12 +20,35 @@ function fail(id: string, error: unknown) {
 ctx.onmessage = (event) => {
   const { id, payload } = event.data
   try {
-    if (payload.type !== 'generate') throw new Error('不支持的 RSA 命令')
-    const encrypt = new JSEncrypt({ default_key_size: String(payload.size || 2048) })
-    ok(id, {
-      publicKey: encrypt.getPublicKey(),
-      privateKey: encrypt.getPrivateKey(),
-    })
+    if (payload.type === 'generate') {
+      const encrypt = new JSEncrypt({ default_key_size: String(payload.size || 2048) })
+      ok(id, {
+        pub: encrypt.getPublicKey(),
+        pri: encrypt.getPrivateKey(),
+      })
+      return
+    }
+
+    if (payload.type === 'crypt') {
+      const cryptor = new JSEncrypt()
+      if (payload.mode === 'encrypt') {
+        if (!payload.pub) throw new Error('缺少公钥')
+        cryptor.setPublicKey(payload.pub)
+        const encrypted = cryptor.encrypt(payload.text)
+        if (!encrypted) throw new Error('RSA 加密失败')
+        ok(id, encrypted)
+        return
+      }
+
+      if (!payload.pri) throw new Error('缺少私钥')
+      cryptor.setPrivateKey(payload.pri)
+      const decrypted = cryptor.decrypt(payload.text)
+      if (!decrypted) throw new Error('RSA 解密失败')
+      ok(id, decrypted)
+      return
+    }
+
+    throw new Error('不支持的 RSA 命令')
   } catch (error) {
     fail(id, error)
   }

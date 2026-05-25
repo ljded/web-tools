@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { onUnmounted, ref, watch, computed } from 'vue'
 import { usePersistedRef } from '@/utils/persist'
 import { useHistory } from '@/utils/history'
+import { useLatestTask } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 import RsaWorker from '@/workers/rsa.worker?worker'
 import CryptoWorker from '@/workers/crypto.worker?worker'
 import { createWorkerPool } from '@/workers/pool'
@@ -16,6 +16,23 @@ const rsaWorkerPool = createWorkerPool(() => new RsaWorker(), { size: 1 })
 const cryptoWorkerPool = createWorkerPool(() => new CryptoWorker(), { size: 2 })
 const MAX_TEXT_CRYPTO_CHARS = 100_000
 const MAX_ASYMMETRIC_CHARS = 4_000
+const latestAes = useLatestTask()
+const latestSm2 = useLatestTask()
+const latestRsa = useLatestTask()
+const latestJwt = useLatestTask()
+const latestBcrypt = useLatestTask()
+const latestSm4 = useLatestTask()
+
+onUnmounted(() => {
+  latestAes.cancel()
+  latestSm2.cancel()
+  latestRsa.cancel()
+  latestJwt.cancel()
+  latestBcrypt.cancel()
+  latestSm4.cancel()
+  rsaWorkerPool.terminate()
+  cryptoWorkerPool.terminate()
+})
 
 function isTooLong(text: string, max: number) { return text.length > max }
 
@@ -30,13 +47,14 @@ function saveAesHistory() { if (!aesText.value.trim()) return; aesHistory.add({ 
 function onAesHistorySelect(item: { data: { text: string; key: string; mode: string } }) { aesText.value = item.data.text; aesKey.value = item.data.key; aesMode.value = item.data.mode as any }
 
 async function computeAes() {
-  if (!aesText.value || !aesKey.value) { aesResult.value = ''; aesError.value = ''; return }
-  if (isTooLong(aesText.value, MAX_TEXT_CRYPTO_CHARS)) { aesResult.value = ''; aesError.value = '输入过长'; return }
+  const isCurrent = latestAes.next()
+  if (!aesText.value || !aesKey.value) { aesResult.value = ''; aesError.value = ''; aesLoading.value = false; return }
+  if (isTooLong(aesText.value, MAX_TEXT_CRYPTO_CHARS)) { aesResult.value = ''; aesError.value = '输入过长'; aesLoading.value = false; return }
   aesLoading.value = true; aesError.value = ''
   const lease = await cryptoWorkerPool.acquire()
-  try { aesResult.value = await lease.send<string>({ type: 'aes', text: aesText.value, key: aesKey.value, mode: aesMode.value }) }
-  catch (e: any) { aesError.value = e?.message || 'AES 操作失败'; aesResult.value = '' }
-  finally { aesLoading.value = false; lease.release() }
+  try { const result = await lease.send<string>({ type: 'aes', text: aesText.value, key: aesKey.value, mode: aesMode.value }); if (isCurrent()) aesResult.value = result }
+  catch (e: any) { if (isCurrent()) { aesError.value = e?.message || 'AES 操作失败'; aesResult.value = '' } }
+  finally { if (isCurrent()) aesLoading.value = false; lease.release() }
 }
 watch([aesText, aesKey, aesMode], () => computeAes(), { immediate: true })
 
@@ -53,19 +71,20 @@ function onSm2HistorySelect(item: { data: { text: string; mode: string } }) { sm
 
 async function genSm2Keys() {
   const lease = await cryptoWorkerPool.acquire()
-  try { const keys = await lease.send<{ pub: string; pri: string }>({ type: 'sm2-keygen' }); sm2PubKey.value = keys.pub; sm2PriKey.value = keys.pri }
+  try { const keys = await lease.send<{ pub: string; pri: string }>({ type: 'sm2-gen-keys' }); sm2PubKey.value = keys.pub; sm2PriKey.value = keys.pri }
   catch (e: any) { sm2Error.value = e?.message || '生成失败' }
   finally { lease.release() }
 }
 
 async function computeSm2() {
-  if (!sm2Text.value) { sm2Result.value = ''; sm2Error.value = ''; return }
-  if (isTooLong(sm2Text.value, MAX_ASYMMETRIC_CHARS)) { sm2Result.value = ''; sm2Error.value = '输入过长'; return }
+  const isCurrent = latestSm2.next()
+  if (!sm2Text.value) { sm2Result.value = ''; sm2Error.value = ''; sm2Loading.value = false; return }
+  if (isTooLong(sm2Text.value, MAX_ASYMMETRIC_CHARS)) { sm2Result.value = ''; sm2Error.value = '输入过长'; sm2Loading.value = false; return }
   sm2Loading.value = true; sm2Error.value = ''
   const lease = await cryptoWorkerPool.acquire()
-  try { sm2Result.value = await lease.send<string>({ type: 'sm2', text: sm2Text.value, pub: sm2PubKey.value, pri: sm2PriKey.value, mode: sm2Mode.value }) }
-  catch (e: any) { sm2Error.value = e?.message || 'SM2 操作失败'; sm2Result.value = '' }
-  finally { sm2Loading.value = false; lease.release() }
+  try { const result = await lease.send<string>({ type: 'sm2', text: sm2Text.value, pub: sm2PubKey.value, pri: sm2PriKey.value, mode: sm2Mode.value }); if (isCurrent()) sm2Result.value = result }
+  catch (e: any) { if (isCurrent()) { sm2Error.value = e?.message || 'SM2 操作失败'; sm2Result.value = '' } }
+  finally { if (isCurrent()) sm2Loading.value = false; lease.release() }
 }
 watch([sm2Text, sm2Mode], () => computeSm2())
 
@@ -82,19 +101,20 @@ function onRsaHistorySelect(item: { data: { text: string; mode: string } }) { rs
 
 async function genRsaKeys() {
   const lease = await rsaWorkerPool.acquire()
-  try { const keys = await lease.send<{ pub: string; pri: string }>({ type: 'keygen' }); rsaPubKey.value = keys.pub; rsaPriKey.value = keys.pri }
+  try { const keys = await lease.send<{ pub: string; pri: string }>({ type: 'generate', size: 2048 }); rsaPubKey.value = keys.pub; rsaPriKey.value = keys.pri }
   catch (e: any) { rsaError.value = e?.message || '生成失败' }
   finally { lease.release() }
 }
 
 async function computeRsa() {
-  if (!rsaText.value) { rsaResult.value = ''; rsaError.value = ''; return }
-  if (isTooLong(rsaText.value, MAX_ASYMMETRIC_CHARS)) { rsaResult.value = ''; rsaError.value = '输入过长'; return }
+  const isCurrent = latestRsa.next()
+  if (!rsaText.value) { rsaResult.value = ''; rsaError.value = ''; rsaLoading.value = false; return }
+  if (isTooLong(rsaText.value, MAX_ASYMMETRIC_CHARS)) { rsaResult.value = ''; rsaError.value = '输入过长'; rsaLoading.value = false; return }
   rsaLoading.value = true; rsaError.value = ''
   const lease = await rsaWorkerPool.acquire()
-  try { rsaResult.value = await lease.send<string>({ type: 'crypt', text: rsaText.value, pub: rsaPubKey.value, pri: rsaPriKey.value, mode: rsaMode.value }) }
-  catch (e: any) { rsaError.value = e?.message || 'RSA 操作失败'; rsaResult.value = '' }
-  finally { rsaLoading.value = false; lease.release() }
+  try { const result = await lease.send<string>({ type: 'crypt', text: rsaText.value, pub: rsaPubKey.value, pri: rsaPriKey.value, mode: rsaMode.value }); if (isCurrent()) rsaResult.value = result }
+  catch (e: any) { if (isCurrent()) { rsaError.value = e?.message || 'RSA 操作失败'; rsaResult.value = '' } }
+  finally { if (isCurrent()) rsaLoading.value = false; lease.release() }
 }
 watch([rsaText, rsaMode], () => computeRsa())
 
@@ -109,17 +129,18 @@ function saveJwtHistory() { if (!jwtText.value.trim()) return; jwtHistory.add({ 
 function onJwtHistorySelect(item: { data: { text: string; secret: string; mode: string } }) { jwtText.value = item.data.text; jwtSecret.value = item.data.secret; jwtMode.value = item.data.mode as any }
 
 async function computeJwt() {
+  const isCurrent = latestJwt.next()
   if (!jwtText.value || !jwtSecret.value) { jwtResult.value = ''; jwtError.value = ''; return }
   jwtError.value = ''
   if (jwtMode.value === 'encode') {
     const lease = await cryptoWorkerPool.acquire()
-    try { jwtResult.value = await lease.send<string>({ type: 'jwt-sign', text: jwtText.value, secret: jwtSecret.value }) }
-    catch (e: any) { jwtError.value = e?.message || '签名失败'; jwtResult.value = '' }
+    try { const result = await lease.send<string>({ type: 'jwt-sign', text: jwtText.value, secret: jwtSecret.value }); if (isCurrent()) jwtResult.value = result }
+    catch (e: any) { if (isCurrent()) { jwtError.value = e?.message || '签名失败'; jwtResult.value = '' } }
     finally { lease.release() }
   } else {
     const lease = await cryptoWorkerPool.acquire()
-    try { jwtResult.value = JSON.stringify(await lease.send<any>({ type: 'jwt-verify', token: jwtText.value, secret: jwtSecret.value }), null, 2) }
-    catch (e: any) { jwtError.value = e?.message || '验证失败'; jwtResult.value = '' }
+    try { const result = JSON.stringify(await lease.send<any>({ type: 'jwt-verify', token: jwtText.value, secret: jwtSecret.value }), null, 2); if (isCurrent()) jwtResult.value = result }
+    catch (e: any) { if (isCurrent()) { jwtError.value = e?.message || '验证失败'; jwtResult.value = '' } }
     finally { lease.release() }
   }
 }
@@ -131,12 +152,13 @@ const bcryptHash = ref(''), bcryptError = ref(''), bcryptLoading = ref(false)
 const bcryptCompare = ref(''), bcryptResult = ref('')
 
 async function computeBcrypt() {
-  if (!bcryptText.value) { bcryptHash.value = ''; bcryptError.value = ''; return }
+  const isCurrent = latestBcrypt.next()
+  if (!bcryptText.value) { bcryptHash.value = ''; bcryptError.value = ''; bcryptLoading.value = false; return }
   bcryptLoading.value = true; bcryptError.value = ''
   const lease = await cryptoWorkerPool.acquire()
-  try { bcryptHash.value = await lease.send<string>({ type: 'bcrypt', text: bcryptText.value }) }
-  catch (e: any) { bcryptError.value = e?.message || '计算失败'; bcryptHash.value = '' }
-  finally { bcryptLoading.value = false; lease.release() }
+  try { const result = await lease.send<string>({ type: 'bcrypt-hash', text: bcryptText.value }); if (isCurrent()) bcryptHash.value = result }
+  catch (e: any) { if (isCurrent()) { bcryptError.value = e?.message || '计算失败'; bcryptHash.value = '' } }
+  finally { if (isCurrent()) bcryptLoading.value = false; lease.release() }
 }
 
 async function verifyBcrypt() {
@@ -161,12 +183,13 @@ function saveSm4History() { if (!sm4Text.value.trim()) return; sm4History.add({ 
 function onSm4HistorySelect(item: { data: { text: string; key: string; mode: string } }) { sm4Text.value = item.data.text; sm4Key.value = item.data.key; sm4Mode.value = item.data.mode as any }
 
 async function computeSm4() {
+  const isCurrent = latestSm4.next()
   if (!sm4Text.value || !sm4Key.value) { sm4Result.value = ''; sm4Error.value = ''; return }
   if (isTooLong(sm4Text.value, MAX_TEXT_CRYPTO_CHARS)) { sm4Result.value = ''; sm4Error.value = '输入过长'; return }
   sm4Error.value = ''
   const lease = await cryptoWorkerPool.acquire()
-  try { sm4Result.value = await lease.send<string>({ type: 'sm4', text: sm4Text.value, key: sm4Key.value, mode: sm4Mode.value }) }
-  catch (e: any) { sm4Error.value = e?.message || 'SM4 操作失败'; sm4Result.value = '' }
+  try { const result = await lease.send<string>({ type: 'sm4', text: sm4Text.value, key: sm4Key.value, mode: sm4Mode.value }); if (isCurrent()) sm4Result.value = result }
+  catch (e: any) { if (isCurrent()) { sm4Error.value = e?.message || 'SM4 操作失败'; sm4Result.value = '' } }
   finally { lease.release() }
 }
 watch([sm4Text, sm4Key, sm4Mode], () => computeSm4(), { immediate: true })
@@ -182,7 +205,7 @@ const tabsConfig = [
 </script>
 
 <template>
-  <ToolLayout max-width="4xl">
+  <ToolPage name="crypto" max-width="4xl">
     <!-- 顶层 Tab 切换 -->
     <UTabs
       v-model="tab"
@@ -195,12 +218,10 @@ const tabsConfig = [
 
     <!-- AES -->
     <div v-if="tab === 'aes'" class="space-y-5">
-      <ToolHeader title="AES 加解密" description="高级加密标准，对称加密算法" icon="i-lucide-lock">
+      <ToolSection title="AES 加解密" description="高级加密标准，对称加密算法">
         <template #actions>
           <HistoryPanel :items="aesHistory.items.value" @select="onAesHistorySelect" @remove="aesHistory.remove" @clear="aesHistory.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <UTabs
           v-model="aesMode"
           :items="[{ label: '加密', value: 'encrypt', icon: 'i-lucide-lock' }, { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' }]"
@@ -222,17 +243,15 @@ const tabsConfig = [
           <UAlert v-if="aesError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="aesError" />
           <ResultPanel v-if="aesResult" title="结果" :value="aesResult" color="primary" />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- SM4 -->
     <div v-if="tab === 'sm4'" class="space-y-5">
-      <ToolHeader title="SM4 国密对称加密" description="国产分组密码算法" icon="i-lucide-file-key">
+      <ToolSection title="SM4 国密对称加密" description="国产分组密码算法">
         <template #actions>
           <HistoryPanel :items="sm4History.items.value" @select="onSm4HistorySelect" @remove="sm4History.remove" @clear="sm4History.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <UTabs
           v-model="sm4Mode"
           :items="[{ label: '加密', value: 'encrypt', icon: 'i-lucide-lock' }, { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' }]"
@@ -248,17 +267,15 @@ const tabsConfig = [
           <UAlert v-if="sm4Error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="sm4Error" />
           <ResultPanel v-if="sm4Result" title="结果" :value="sm4Result" color="secondary" />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- RSA -->
     <div v-if="tab === 'rsa'" class="space-y-5">
-      <ToolHeader title="RSA 加解密" description="非对称加密算法，支持 2048 位密钥" icon="i-lucide-key-round">
+      <ToolSection title="RSA 加解密" description="非对称加密算法，支持 2048 位密钥">
         <template #actions>
           <HistoryPanel :items="rsaHistory.items.value" @select="onRsaHistorySelect" @remove="rsaHistory.remove" @clear="rsaHistory.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <UTabs
           v-model="rsaMode"
           :items="[{ label: '加密', value: 'encrypt', icon: 'i-lucide-lock' }, { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' }]"
@@ -283,17 +300,15 @@ const tabsConfig = [
           <UAlert v-if="rsaError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="rsaError" />
           <ResultPanel v-if="rsaResult" title="结果" :value="rsaResult" color="primary" />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- SM2 -->
     <div v-if="tab === 'sm2'" class="space-y-5">
-      <ToolHeader title="SM2 国密非对称" description="国产椭圆曲线密码算法" icon="i-lucide-shield-check">
+      <ToolSection title="SM2 国密非对称" description="国产椭圆曲线密码算法">
         <template #actions>
           <HistoryPanel :items="sm2History.items.value" @select="onSm2HistorySelect" @remove="sm2History.remove" @clear="sm2History.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <div class="flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3">
           <span class="text-sm text-primary"><UIcon name="i-lucide-key-round" class="inline size-4" /> 密钥对</span>
           <UButton color="primary" size="sm" icon="i-lucide-refresh-cw" @click="genSm2Keys" class="rounded-lg px-3 py-2 text-xs font-medium">生成密钥对</UButton>
@@ -323,17 +338,15 @@ const tabsConfig = [
           <UAlert v-if="sm2Error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="sm2Error" />
           <ResultPanel v-if="sm2Result" title="结果" :value="sm2Result" color="primary" :copyable="!sm2Result.startsWith('✅') && !sm2Result.startsWith('❌')" />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- JWT -->
     <div v-if="tab === 'jwt'" class="space-y-5">
-      <ToolHeader title="JWT 编解码" description="JSON Web Token 签名与验证" icon="i-lucide-scan-line">
+      <ToolSection title="JWT 编解码" description="JSON Web Token 签名与验证">
         <template #actions>
           <HistoryPanel :items="jwtHistory.items.value" @select="onJwtHistorySelect" @remove="jwtHistory.remove" @clear="jwtHistory.clear" />
         </template>
-      </ToolHeader>
-      <ToolCard>
         <UTabs
           v-model="jwtMode"
           :items="[{ label: '编码', value: 'encode', icon: 'i-lucide-lock' }, { label: '解码', value: 'decode', icon: 'i-lucide-unlock' }]"
@@ -349,13 +362,12 @@ const tabsConfig = [
           <UAlert v-if="jwtError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="jwtError" />
           <ResultPanel v-if="jwtResult" title="结果" :value="jwtResult" color="primary" pre-wrap />
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
 
     <!-- Bcrypt -->
     <div v-if="tab === 'bcrypt'" class="space-y-5">
-      <ToolHeader title="Bcrypt 哈希" description="密码哈希与验证" icon="i-lucide-fingerprint" />
-      <ToolCard>
+      <ToolSection title="Bcrypt 哈希" description="密码哈希与验证">
         <div class="space-y-5 p-6">
           <UFormField label="密码">
             <UInput v-model="bcryptText" placeholder="输入密码..." class="w-full" />
@@ -376,7 +388,7 @@ const tabsConfig = [
             <UAlert v-else-if="bcryptResult" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="bcryptResult" />
           </div>
         </div>
-      </ToolCard>
+      </ToolSection>
     </div>
-  </ToolLayout>
+  </ToolPage>
 </template>

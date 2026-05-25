@@ -2,10 +2,9 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useToolState, useFileHandler } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 
 const MAX_TEXT_CONVERT_CHARS = 2_000_000
 const MAX_FILE_ENCODE_BYTES = 500 * 1024 * 1024
@@ -21,6 +20,7 @@ const encodeError = ref('')
 const { input, history, saveHistory } = useToolState<string, { mode: 'encode' | 'decode'; input: string }>({
   storageKey: 'base64',
   defaultInput: '',
+  getHistoryData: (value) => ({ mode: mode.value, input: value }),
   historyOptions: {
     maxCount: 15,
     generateLabel: (d) => `[${d.mode === 'encode' ? '编码' : '解码'}] ${d.input.slice(0, 40)}${d.input.length > 40 ? '...' : ''}`,
@@ -189,10 +189,8 @@ onUnmounted(() => cleanupPreview())
 </script>
 
 <template>
-  <ToolLayout max-width="3xl">
-    <ToolHeader title="Base64 工具" description="文本与文件 Base64 编码、解码和图片预览" icon="i-lucide-binary" />
-
-    <ToolCard title="输入" description="选择编码或解码模式，支持文本和文件输入。">
+  <ToolPage name="base64" max-width="3xl" icon="i-lucide-binary">
+    <ToolSection title="输入" description="选择编码或解码模式，支持文本和文件输入。">
       <template #actions>
         <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
       </template>
@@ -247,10 +245,10 @@ onUnmounted(() => cleanupPreview())
           <img :src="imgPreview" class="max-h-64 max-w-full rounded-lg object-contain" @error="onImgError" />
         </div>
       </div>
-    </ToolCard>
+    </ToolSection>
 
     <ResultPanel v-if="finalResult" title="结果" :value="finalResult" pre-wrap>
       {{ resultDisplay }}
     </ResultPanel>
-  </ToolLayout>
+  </ToolPage>
 </template>

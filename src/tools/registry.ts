@@ -1,6 +1,9 @@
 import type { RouteRecordRaw } from 'vue-router'
 
 export type ToolDomain = 'dev' | 'crypto' | 'media' | 'text'
+export type NuxtSemanticColor = 'neutral' | 'primary' | 'secondary' | 'success' | 'info' | 'warning' | 'error'
+export type ToolStatus = 'stable' | 'beta' | 'experimental'
+export type ToolCapability = 'text' | 'file' | 'image' | 'pdf' | 'worker' | 'history' | 'offline'
 
 export interface ToolDefinition {
   name: string
@@ -8,11 +11,14 @@ export interface ToolDefinition {
   i18nKey: string
   domain: ToolDomain
   icon: string
-  color: string
+  color: NuxtSemanticColor
   component: () => Promise<unknown>
   keywords?: string[]
   tags?: string[]
   hotkey?: string
+  capabilities?: ToolCapability[]
+  status?: ToolStatus
+  related?: string[]
 }
 
 export const domainI18nKeys: Record<ToolDomain, string> = {
@@ -33,6 +39,7 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/crypto/Hash.vue'),
     keywords: ['md5', 'sha1', 'sha256', 'sha512', 'sm3', 'checksum', 'digest', 'hash', '哈希', '校验'],
     tags: ['security', 'file'],
+    capabilities: ['text', 'file', 'worker', 'history', 'offline'],
   },
   {
     name: 'crypto',
@@ -44,6 +51,7 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/crypto/Crypto.vue'),
     keywords: ['aes', 'rsa', 'sm2', 'sm4', 'bcrypt', 'encrypt', 'decrypt', '加密', '解密'],
     tags: ['security', 'format'],
+    capabilities: ['text', 'worker', 'history', 'offline'],
   },
   {
     name: 'json',
@@ -55,6 +63,7 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/dev/JsonEditor.vue'),
     keywords: ['json', 'format', 'validate', 'jwt', 'formatter', '格式化', '验证'],
     tags: ['format', 'dev'],
+    capabilities: ['text', 'history', 'offline'],
   },
   {
     name: 'timestamp',
@@ -66,6 +75,7 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/dev/Timestamp.vue'),
     keywords: ['timestamp', 'timezone', 'date', 'unix', '时间戳', '时区', '日期'],
     tags: ['convert', 'dev'],
+    capabilities: ['text', 'history', 'offline'],
   },
   {
     name: 'random',
@@ -77,6 +87,139 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/dev/RandomData.vue'),
     keywords: ['random', 'uuid', 'faker', 'phone', '生成', '随机', '假数据'],
     tags: ['generate', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'scoreboard',
+    path: '/scoreboard',
+    i18nKey: 'tools.scoreboard',
+    domain: 'dev',
+    icon: 'i-lucide-trophy',
+    color: 'warning',
+    component: () => import('@/views/dev/Scoreboard.vue'),
+    keywords: ['scoreboard', 'score', 'team', 'counter', '计分', '比赛'],
+    tags: ['utility', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'timer',
+    path: '/timer',
+    i18nKey: 'tools.timer',
+    domain: 'dev',
+    icon: 'i-lucide-timer',
+    color: 'primary',
+    component: () => import('@/views/dev/TimerTool.vue'),
+    keywords: ['timer', 'countdown', 'clock', '计时器', '倒计时'],
+    tags: ['utility', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'pomodoro',
+    path: '/pomodoro',
+    i18nKey: 'tools.pomodoro',
+    domain: 'dev',
+    icon: 'i-lucide-timer-reset',
+    color: 'error',
+    component: () => import('@/views/dev/PomodoroTool.vue'),
+    keywords: ['pomodoro', 'focus', 'timer', '番茄钟', '专注'],
+    tags: ['utility', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'picker',
+    path: '/picker',
+    i18nKey: 'tools.picker',
+    domain: 'dev',
+    icon: 'i-lucide-list-checks',
+    color: 'secondary',
+    component: () => import('@/views/dev/RandomPicker.vue'),
+    keywords: ['picker', 'random pick', 'lottery', 'choice', '抽取', '随机选择'],
+    tags: ['utility', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'calculator',
+    path: '/calculator',
+    i18nKey: 'tools.calculator',
+    domain: 'dev',
+    icon: 'i-lucide-calculator',
+    color: 'info',
+    component: () => import('@/views/dev/CalculatorTool.vue'),
+    keywords: ['calculator', 'math', '算术', '计算器'],
+    tags: ['utility', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'unit',
+    path: '/unit',
+    i18nKey: 'tools.unit',
+    domain: 'dev',
+    icon: 'i-lucide-ruler',
+    color: 'primary',
+    component: () => import('@/views/dev/UnitConverter.vue'),
+    keywords: ['unit', 'convert', 'length', 'weight', 'temperature', '单位换算'],
+    tags: ['convert', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'bmi',
+    path: '/bmi',
+    i18nKey: 'tools.bmi',
+    domain: 'dev',
+    icon: 'i-lucide-heart-pulse',
+    color: 'success',
+    component: () => import('@/views/dev/BmiTool.vue'),
+    keywords: ['bmi', 'health', 'body mass index', '体重指数'],
+    tags: ['utility', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'base',
+    path: '/base',
+    i18nKey: 'tools.base',
+    domain: 'dev',
+    icon: 'i-lucide-binary',
+    color: 'secondary',
+    component: () => import('@/views/dev/BaseConverter.vue'),
+    keywords: ['base convert', 'binary', 'hex', 'decimal', '进制转换'],
+    tags: ['convert', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'markdown',
+    path: '/markdown',
+    i18nKey: 'tools.markdown',
+    domain: 'dev',
+    icon: 'i-lucide-file-text',
+    color: 'primary',
+    component: () => import('@/views/dev/MarkdownTool.vue'),
+    keywords: ['markdown', 'md', 'preview', 'editor', 'markdown 编辑'],
+    tags: ['editor', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'js-sandbox',
+    path: '/js-sandbox',
+    i18nKey: 'tools.jsSandbox',
+    domain: 'dev',
+    icon: 'i-lucide-square-terminal',
+    color: 'warning',
+    component: () => import('@/views/dev/JsSandboxTool.vue'),
+    keywords: ['javascript', 'sandbox', 'runner', 'js', '脚本沙盒'],
+    tags: ['editor', 'dev'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'cron',
+    path: '/cron',
+    i18nKey: 'tools.cron',
+    domain: 'dev',
+    icon: 'i-lucide-calendar-clock',
+    color: 'info',
+    component: () => import('@/views/dev/CronParserTool.vue'),
+    keywords: ['cron', 'schedule', 'parser', 'crontab', '定时表达式'],
+    tags: ['parser', 'dev'],
+    capabilities: ['text', 'offline'],
   },
   {
     name: 'color',
@@ -88,6 +231,7 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/dev/ColorTool.vue'),
     keywords: ['color', 'hex', 'rgb', 'hsl', 'picker', '颜色', '调色板'],
     tags: ['convert', 'dev'],
+    capabilities: ['text', 'offline'],
   },
   {
     name: 'base64',
@@ -99,6 +243,7 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/text/Base64.vue'),
     keywords: ['base64', 'encode', 'decode', 'data uri', '编码', '解码', 'base64 编码'],
     tags: ['convert', 'format'],
+    capabilities: ['text', 'file', 'image', 'history', 'offline'],
   },
   {
     name: 'encoding',
@@ -110,6 +255,31 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/text/Encoding.vue'),
     keywords: ['unicode', 'gbk', 'utf8', 'url encode', 'html entity', '编码转换', '字符集'],
     tags: ['convert'],
+    capabilities: ['text', 'history', 'offline'],
+  },
+  {
+    name: 'morse',
+    path: '/morse',
+    i18nKey: 'tools.morse',
+    domain: 'text',
+    icon: 'i-lucide-radio-tower',
+    color: 'warning',
+    component: () => import('@/views/text/MorseTool.vue'),
+    keywords: ['morse', 'code', 'encode', 'decode', '莫斯电码'],
+    tags: ['convert', 'text'],
+    capabilities: ['text', 'offline'],
+  },
+  {
+    name: 'bigtext',
+    path: '/bigtext',
+    i18nKey: 'tools.bigtext',
+    domain: 'text',
+    icon: 'i-lucide-database',
+    color: 'secondary',
+    component: () => import('@/views/text/BigTextTool.vue'),
+    keywords: ['big text', 'large text', 'stats', 'dedupe', '大文本处理'],
+    tags: ['text', 'utility'],
+    capabilities: ['text', 'offline'],
   },
   {
     name: 'regex',
@@ -121,6 +291,7 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/text/Regex.vue'),
     keywords: ['regex', 'regexp', 'match', 'replace', '正则', '正则表达式'],
     tags: ['dev'],
+    capabilities: ['text', 'history', 'offline'],
   },
   {
     name: 'diff',
@@ -132,6 +303,19 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/text/DiffTool.vue'),
     keywords: ['diff', 'compare', 'merge', '对比', '比较', '文本差异'],
     tags: ['compare', 'dev'],
+    capabilities: ['text', 'image', 'offline'],
+  },
+  {
+    name: 'string',
+    path: '/string',
+    i18nKey: 'tools.string',
+    domain: 'text',
+    icon: 'i-lucide-case-sensitive',
+    color: 'secondary',
+    component: () => import('@/views/text/StringTool.vue'),
+    keywords: ['string', 'case', 'camel', 'snake', 'kebab', '文本处理', '字符串', '大小写'],
+    tags: ['convert', 'text'],
+    capabilities: ['text', 'history', 'offline'],
   },
   {
     name: 'qrcode',
@@ -143,6 +327,7 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/media/Qrcode.vue'),
     keywords: ['qrcode', 'qr', '二维码', 'barcode', '扫码'],
     tags: ['generate', 'media'],
+    capabilities: ['text', 'image', 'file', 'offline'],
   },
   {
     name: 'image',
@@ -152,8 +337,9 @@ export const tools: ToolDefinition[] = [
     icon: 'i-lucide-image',
     color: 'success',
     component: () => import('@/views/media/ImageTool.vue'),
-    keywords: ['image', 'compress', 'resize', 'crop', '图片', '压缩', '裁剪'],
-    tags: ['convert', 'media'],
+    keywords: ['image', 'compress', 'resize', 'crop', 'phantom tank', 'stitch', 'gif', 'metadata', 'editor', '图片', '压缩', '裁剪', '幻影坦克', '拼接'],
+    tags: ['convert', 'media', 'gif', 'editor'],
+    capabilities: ['image', 'file', 'offline'],
   },
   {
     name: 'pdf',
@@ -165,6 +351,7 @@ export const tools: ToolDefinition[] = [
     component: () => import('@/views/media/PdfTool.vue'),
     keywords: ['pdf', 'merge', 'split', 'extract', 'merge pdf', 'pdf 合并', 'pdf 拆分'],
     tags: ['convert', 'media', 'file'],
+    capabilities: ['pdf', 'file', 'worker', 'offline'],
   },
 ]
 

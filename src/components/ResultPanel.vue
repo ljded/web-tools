@@ -1,5 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import CopyBtn from './CopyBtn.vue'
+
+const { t } = useI18n()
 
 withDefaults(
   defineProps<{
@@ -14,9 +17,9 @@ withDefaults(
     compact?: boolean
   }>(),
   {
-    title: '结果',
+    title: undefined,
     value: '',
-    placeholder: '等待输入...',
+    placeholder: undefined,
     copyable: true,
     monospace: true,
     preWrap: false,
@@ -39,22 +42,22 @@ const colorClasses = {
 
 <template>
   <UCard
-    variant="outline"
-    :ui="{ root: 'overflow-hidden rounded-3xl shadow-sm', body: compact ? 'p-3' : 'p-4' }"
+    variant="subtle"
+    :ui="{ root: 'overflow-hidden rounded-3xl border-default/70 bg-elevated/75 shadow-lg shadow-default/5', body: compact ? 'p-3' : 'p-4' }"
   >
     <div class="mb-2 flex items-center justify-between gap-3">
-      <span class="text-xs font-medium uppercase tracking-wide text-muted">{{ title }}</span>
+      <span class="text-xs font-medium uppercase tracking-wide text-muted">{{ title || t('app.result') }}</span>
       <div class="flex items-center gap-2">
         <slot name="actions" />
         <CopyBtn v-if="copyable" :text="value" variant="button" />
       </div>
     </div>
     <div
-      class="break-all rounded-2xl p-3 text-sm"
+      class="break-all rounded-2xl border border-default/60 p-3 text-sm leading-6 shadow-inner shadow-default/5"
       :style="maxHeight ? { maxHeight, overflow: 'auto' } : undefined"
       :class="[colorClasses[color], { 'font-mono': monospace, 'whitespace-pre-wrap': preWrap }]"
     >
-      <slot>{{ value || placeholder }}</slot>
+      <slot>{{ value || placeholder || t('app.waitingForInput') }}</slot>
     </div>
   </UCard>
 </template>

@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useToolState } from '@/composables'
-import ToolLayout from '@/components/ToolLayout.vue'
-import ToolHeader from '@/components/ToolHeader.vue'
-import ToolCard from '@/components/ToolCard.vue'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import CopyBtn from '@/components/CopyBtn.vue'
+import ToolPage from '@/components/tool/ToolPage.vue'
+import ToolSection from '@/components/tool/ToolSection.vue'
 
 const rgb = ref({ r: 103, g: 80, b: 164 })
 const hsl = ref({ h: 261, s: 35, l: 48 })
@@ -14,6 +13,7 @@ const eyeDropperError = ref('')
 const { input: hex, history, saveHistory } = useToolState<string, { hex: string }>({
   storageKey: 'color',
   defaultInput: '#6750a4',
+  getHistoryData: (value) => ({ hex: value }),
   historyOptions: { maxCount: 15, generateLabel: (d) => d.hex.toUpperCase() },
 })
 
@@ -79,12 +79,10 @@ function onNativeColorChange(e: Event) {
 </script>
 
 <template>
-  <ToolLayout max-width="4xl">
-    <ToolHeader title="颜色工具" description="Hex、RGB、HSL 颜色格式转换" icon="i-lucide-palette" />
-
+  <ToolPage name="color" max-width="4xl">
     <input ref="colorInputRef" type="color" class="sr-only" @change="onNativeColorChange" />
 
-    <ToolCard>
+    <ToolSection>
       <div class="mb-6 flex items-center gap-4">
         <div class="h-20 w-20 rounded-2xl shadow-sm outline outline-2 border-default" :style="colorPreviewBg" />
         <div class="flex-1">
@@ -96,9 +94,9 @@ function onNativeColorChange(e: Event) {
         </UButton>
       </div>
       <UAlert v-if="eyeDropperError" color="error" variant="soft" icon="i-lucide-circle-alert" :description="eyeDropperError" />
-    </ToolCard>
+    </ToolSection>
 
-    <ToolCard>
+    <ToolSection>
       <div class="space-y-6">
         <div>
           <div class="mb-2 flex items-center justify-between">
@@ -147,6 +145,6 @@ function onNativeColorChange(e: Event) {
           </div>
         </div>
       </div>
-    </ToolCard>
-  </ToolLayout>
+    </ToolSection>
+  </ToolPage>
 </template>
