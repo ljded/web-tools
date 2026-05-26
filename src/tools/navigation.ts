@@ -1,4 +1,4 @@
-import { domainI18nKeys, tools, type ToolDomain } from '@/tools/registry'
+import { domainI18nKeys, toolsByDomain, toolsByName, toolsByPath, type ToolDomain } from '@/tools/registry'
 
 export interface AppNavigationItem {
   label: string
@@ -25,8 +25,7 @@ export function createNavigationGroups(t: Translate, currentPath: string): AppNa
   return toolDomainOrder.map((domain) => ({
     label: t(domainI18nKeys[domain]),
     domain,
-    items: tools
-      .filter((tool) => tool.domain === domain)
+    items: toolsByDomain[domain]
       .map((tool) => ({
         label: t(`${tool.i18nKey}.title`),
         icon: tool.icon,
@@ -69,7 +68,7 @@ export function createFavoriteNavigationItems(
   onNavigate?: () => void,
 ): AppNavigationItem[] {
   return favoriteToolNames
-    .map((name) => tools.find((tool) => tool.name === name))
+    .map((name) => toolsByName.get(name))
     .filter((tool): tool is NonNullable<typeof tool> => Boolean(tool))
     .map((tool) => ({
       label: t(`${tool.i18nKey}.title`),
@@ -83,6 +82,6 @@ export function createFavoriteNavigationItems(
 export function getCurrentNavigationTitle(t: Translate, currentPath: string): string {
   if (currentPath === '/') return t('nav.home')
 
-  const currentTool = tools.find((tool) => tool.path === currentPath)
+  const currentTool = toolsByPath.get(currentPath)
   return currentTool ? t(`${currentTool.i18nKey}.title`) : t('app.title')
 }

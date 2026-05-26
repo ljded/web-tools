@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import CopyBtn from '@/components/CopyBtn.vue'
+import { useI18n } from 'vue-i18n'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
 
+const { t, locale } = useI18n()
 const expression = usePersistedRef('web-tools:cron:expression', '*/15 9-18 * * 1-5')
 
 interface ParsedCron {
@@ -17,7 +18,7 @@ interface ParsedCron {
 function parseCron(exp: string): ParsedCron {
   const parts = exp.trim().split(/\s+/)
   if (parts.length !== 5) {
-    return { parts, valid: false, error: 'Cron 表达式必须包含 5 个字段' }
+    return { parts, valid: false, error: t('tools.cron.invalidFieldCount') }
   }
   return { parts, valid: true }
 }
@@ -68,7 +69,7 @@ function nextRuns(exp: string, limit = 5): string[] {
       matchField(date.getMonth() + 1, mon!, 1, 12) &&
       matchField(date.getDay(), dow!, 0, 6)
     ) {
-      runs.push(date.toLocaleString())
+      runs.push(date.toLocaleString(locale.value))
     }
     date = new Date(date.getTime() + 60_000)
   }
@@ -82,35 +83,47 @@ const fieldExplain = computed(() => {
   if (!parsed.value.valid) return []
   const [minute, hour, day, month, week] = parsed.value.parts
   return [
-    { label: '分钟', value: minute },
-    { label: '小时', value: hour },
-    { label: '日期', value: day },
-    { label: '月份', value: month },
-    { label: '星期', value: week },
+    { label: t('tools.cron.fieldLabels.minute'), value: minute },
+    { label: t('tools.cron.fieldLabels.hour'), value: hour },
+    { label: t('tools.cron.fieldLabels.day'), value: day },
+    { label: t('tools.cron.fieldLabels.month'), value: month },
+    { label: t('tools.cron.fieldLabels.week'), value: week },
   ]
 })
 
 const runs = computed(() => nextRuns(expression.value))
+const resultText = computed(() => {
+  if (!parsed.value.valid) return ''
+  return [
+    t('tools.cron.fieldsResultTitle'),
+    ...fieldExplain.value.map((item) => `${item.label}: ${item.value}`),
+    '',
+    t('tools.cron.nextRunsResultTitle'),
+    ...runs.value.map((run, index) => `${index + 1}. ${run}`),
+  ].join('\n')
+})
 </script>
 
 <template>
-  <ToolPage name="cron" max-width="4xl" icon="i-lucide-calendar-clock">
-    <ToolSection :title="$t('tools.cron.inputTitle')" :description="$t('tools.cron.inputDesc')">
-      <UInput v-model="expression" :placeholder="$t('tools.cron.placeholder')" class="w-full" />
-      <div class="mt-3 text-xs text-muted">{{ $t('tools.cron.formatHint') }}</div>
-      <UAlert v-if="!parsed.valid" class="mt-3" color="error" variant="soft" icon="i-lucide-circle-alert" :description="parsed.error" />
-    </ToolSection>
+  <ToolPage name="cron" max-width="6xl" icon="i-lucide-calendar-clock">
+    <div class="tool-workspace">
+      <ToolSection :title="$t('tools.cron.inputTitle')" :description="$t('tools.cron.inputDesc')">
+        <div class="space-y-4">
+          <UInput v-model="expression" :placeholder="$t('tools.cron.placeholder')" class="w-full font-mono" size="lg" />
+          <div class="text-xs text-muted">{{ $t('tools.cron.formatHint') }}</div>
+          <UAlert v-if="!parsed.valid" color="error" variant="soft" icon="i-lucide-circle-alert" :description="parsed.error" />
+          <ResultPanel v-if="parsed.valid" class="lg:hidden" :title="$t('tools.cron.nextRunsTitle')" :value="resultText" pre-wrap compact />
+        </div>
+      </ToolSection>
 
-    <ResultPanel v-if="parsed.valid" :title="$t('tools.cron.fieldsTitle')" :value="fieldExplain.map((item) => `${item.label}: ${item.value}`).join('\n')" pre-wrap>
-      <template #actions>
-        <CopyBtn :text="fieldExplain.map((item) => `${item.label}: ${item.value}`).join('\n')" variant="button" />
-      </template>
-    </ResultPanel>
-
-    <ResultPanel v-if="parsed.valid" :title="$t('tools.cron.nextRunsTitle')" :value="runs.join('\n')" pre-wrap>
-      <template #actions>
-        <CopyBtn :text="runs.join('\n')" variant="button" :disabled="!runs.length" />
-      </template>
-    </ResultPanel>
+      <div class="hidden lg:block tool-preview-sticky">
+        <ResultPanel
+          :title="$t('tools.cron.nextRunsTitle')"
+          :value="resultText"
+          :error="parsed.valid ? '' : parsed.error"
+          pre-wrap
+        />
+      </div>
+    </div>
   </ToolPage>
 </template>

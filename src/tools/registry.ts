@@ -64,6 +64,20 @@ export const tools: ToolDefinition[] = [
     keywords: ['json', 'format', 'validate', 'jwt', 'formatter', '格式化', '验证'],
     tags: ['format', 'dev'],
     capabilities: ['text', 'history', 'offline'],
+    hotkey: 'J',
+    related: ['api-debugger', 'regex', 'base64'],
+  },
+  {
+    name: 'api-debugger',
+    path: '/api-debugger',
+    i18nKey: 'tools.apiDebugger',
+    domain: 'dev',
+    icon: 'i-lucide-send',
+    color: 'info',
+    component: () => import('@/views/dev/ApiDebugger.vue'),
+    keywords: ['api', 'http', 'request', 'debug', 'curl', '接口', '调试', '请求'],
+    tags: ['dev', 'http'],
+    capabilities: ['text', 'history', 'offline'],
   },
   {
     name: 'timestamp',
@@ -354,6 +368,16 @@ export const tools: ToolDefinition[] = [
     capabilities: ['pdf', 'file', 'worker', 'offline'],
   },
 ]
+
+export const toolsByName = new Map(tools.map((tool) => [tool.name, tool]))
+export const toolsByPath = new Map(tools.map((tool) => [tool.path, tool]))
+export const toolsByDomain = tools.reduce((groups, tool) => {
+  groups[tool.domain].push(tool)
+  return groups
+}, { dev: [], text: [], crypto: [], media: [] } as Record<ToolDomain, ToolDefinition[]>)
+
+export const offlineTools = tools.filter((tool) => tool.capabilities?.includes('offline'))
+export const workerTools = tools.filter((tool) => tool.capabilities?.includes('worker'))
 
 export function createToolRoutes(): RouteRecordRaw[] {
   return tools.map((tool) => ({

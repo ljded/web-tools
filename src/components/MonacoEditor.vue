@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import * as monaco from 'monaco-editor'
+import type * as Monaco from 'monaco-editor'
 import { useColorMode } from '@vueuse/core'
 import { applyChineseLocale } from '@/utils/monaco'
 
@@ -11,7 +11,7 @@ const props = defineProps<{
   language?: string
   diff?: boolean
   readOnly?: boolean
-  options?: monaco.editor.IStandaloneEditorConstructionOptions | monaco.editor.IStandaloneDiffEditorConstructionOptions
+  options?: Monaco.editor.IStandaloneEditorConstructionOptions | Monaco.editor.IStandaloneDiffEditorConstructionOptions
 }>()
 
 const emit = defineEmits<{
@@ -22,18 +22,22 @@ const emit = defineEmits<{
 }>()
 
 const containerRef = ref<HTMLDivElement | null>(null)
-let editorInstance: monaco.editor.IStandaloneCodeEditor | monaco.editor.IStandaloneDiffEditor | null = null
-let originalModel: monaco.editor.ITextModel | null = null
-let modifiedModel: monaco.editor.ITextModel | null = null
+let monacoApi: typeof Monaco | null = null
+let editorInstance: Monaco.editor.IStandaloneCodeEditor | Monaco.editor.IStandaloneDiffEditor | null = null
+let originalModel: Monaco.editor.ITextModel | null = null
+let modifiedModel: Monaco.editor.ITextModel | null = null
+let disposed = false
 const colorMode = useColorMode()
 
 function getTheme() {
   return colorMode.value === 'dark' ? 'vs-dark' : 'vs'
 }
 
-onMounted(() => {
+onMounted(async () => {
+  const monaco = await import('monaco-editor')
+  monacoApi = monaco
   applyChineseLocale()
-  if (!containerRef.value) return
+  if (disposed || !containerRef.value) return
 
   if (props.diff) {
     const diffEditor = monaco.editor.createDiffEditor(containerRef.value, {
@@ -41,7 +45,7 @@ onMounted(() => {
       automaticLayout: true,
       renderSideBySide: true,
       readOnly: props.readOnly ?? false,
-      ...((props.options as monaco.editor.IStandaloneDiffEditorConstructionOptions) || {}),
+      ...((props.options as Monaco.editor.IStandaloneDiffEditorConstructionOptions) || {}),
     })
 
     originalModel = monaco.editor.createModel(props.original || '', props.language || 'text')
@@ -67,7 +71,7 @@ onMounted(() => {
       minimap: { enabled: false },
       readOnly: props.readOnly ?? false,
       scrollBeyondLastLine: false,
-      ...((props.options as monaco.editor.IStandaloneEditorConstructionOptions) || {}),
+      ...((props.options as Monaco.editor.IStandaloneEditorConstructionOptions) || {}),
     })
 
     standaloneEditor.onDidChangeModelContent(() => {
@@ -82,7 +86,7 @@ onMounted(() => {
 watch(
   () => colorMode.value,
   () => {
-    monaco.editor.setTheme(getTheme())
+    monacoApi?.editor.setTheme(getTheme())
   },
 )
 
@@ -90,7 +94,7 @@ watch(
   () => props.modelValue,
   (val) => {
     if (!editorInstance || props.diff) return
-    const standalone = editorInstance as monaco.editor.IStandaloneCodeEditor
+    const standalone = editorInstance as Monaco.editor.IStandaloneCodeEditor
     if (standalone.getValue() !== val) {
       standalone.setValue(val || '')
     }
@@ -120,6 +124,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  disposed = true
   if (editorInstance) {
     editorInstance.dispose()
     editorInstance = null

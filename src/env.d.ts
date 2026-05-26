@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 /// <reference types="vite-plugin-pwa/client" />
 
+declare const __APP_VERSION__: string
+
 declare module 'sm-crypto' {
   export function sm3(input: string): string
   export namespace sm2 {

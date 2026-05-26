@@ -30,7 +30,7 @@ function reset() {
   <UCard
     v-else
     variant="outline"
-    :ui="{ root: 'mx-auto max-w-2xl rounded-3xl shadow-sm', body: 'p-6' }"
+    :ui="{ root: 'hig-surface mx-auto max-w-2xl rounded-[1.75rem] border shadow-sm', body: 'p-6' }"
   >
     <div class="flex items-start gap-4">
       <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-error/10 text-error">

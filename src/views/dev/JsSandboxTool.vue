@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import CopyBtn from '@/components/CopyBtn.vue'
+import { useI18n } from 'vue-i18n'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
 
+const { t } = useI18n()
 const code = usePersistedRef(
   'web-tools:js-sandbox:code',
   "const sum = input.numbers.reduce((a, b) => a + b, 0);\nconsole.log('sum=', sum);\nreturn { sum, avg: sum / input.numbers.length }",
@@ -70,7 +71,7 @@ async function runCode() {
   try {
     parsedInput = JSON.parse(inputJson.value)
   } catch {
-    output.value = 'Invalid JSON input'
+    output.value = t('tools.jsSandbox.invalidJsonInput')
     logs.value = []
     return
   }
@@ -101,48 +102,43 @@ async function runCode() {
 <template>
   <ToolPage name="js-sandbox" max-width="6xl" icon="i-lucide-square-terminal">
     <ToolSection compact>
-      <div class="flex flex-wrap items-center gap-2">
-        <UButton color="primary" class="rounded-full" icon="i-lucide-play" :loading="isRunning" @click="runCode">
-          {{ $t('tools.jsSandbox.run') }}
-        </UButton>
-        <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-align-left" @click="formatEditor(codeEditorRef)">
-          格式化代码
-        </UButton>
-        <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-braces" @click="formatInputJson">
-          格式化输入
-        </UButton>
+      <div class="tool-command-bar justify-between">
+        <div class="flex flex-wrap items-center gap-2">
+          <UButton color="primary" class="rounded-full" icon="i-lucide-play" :loading="isRunning" @click="runCode">
+            {{ $t('tools.jsSandbox.run') }}
+          </UButton>
+          <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-align-left" @click="formatEditor(codeEditorRef)">
+            {{ $t('tools.jsSandbox.formatCode') }}
+          </UButton>
+          <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-braces" @click="formatInputJson">
+            {{ $t('tools.jsSandbox.formatInput') }}
+          </UButton>
+        </div>
         <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-eraser" @click="clearOutput">
-          清空输出
+          {{ $t('tools.jsSandbox.clearOutput') }}
         </UButton>
       </div>
     </ToolSection>
 
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <ToolSection :title="$t('tools.jsSandbox.codeTitle')" :description="$t('tools.jsSandbox.codeDesc')" :padding="false">
-        <div class="h-[420px]">
-          <MonacoEditor ref="codeEditorRef" v-model="code" language="javascript" :options="{ wordWrap: 'on', minimap: { enabled: false } }" />
-        </div>
-      </ToolSection>
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)]">
+      <div class="space-y-4">
+        <ToolSection :title="$t('tools.jsSandbox.codeTitle')" :description="$t('tools.jsSandbox.codeDesc')" :padding="false">
+          <div class="h-[460px] overflow-hidden rounded-b-[1.75rem]">
+            <MonacoEditor ref="codeEditorRef" v-model="code" language="javascript" :options="{ wordWrap: 'on', minimap: { enabled: false } }" />
+          </div>
+        </ToolSection>
 
-      <ToolSection :title="$t('tools.jsSandbox.inputTitle')" :description="$t('tools.jsSandbox.inputDesc')" :padding="false">
-        <div class="h-[420px]">
-          <MonacoEditor ref="inputEditorRef" v-model="inputJson" language="json" :options="{ wordWrap: 'on', minimap: { enabled: false } }" />
-        </div>
-      </ToolSection>
-    </div>
+        <ToolSection :title="$t('tools.jsSandbox.inputTitle')" :description="$t('tools.jsSandbox.inputDesc')" :padding="false">
+          <div class="h-[260px] overflow-hidden rounded-b-[1.75rem]">
+            <MonacoEditor ref="inputEditorRef" v-model="inputJson" language="json" :options="{ wordWrap: 'on', minimap: { enabled: false } }" />
+          </div>
+        </ToolSection>
+      </div>
 
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <ResultPanel :title="$t('tools.jsSandbox.outputTitle')" :value="output" pre-wrap>
-        <template #actions>
-          <CopyBtn :text="output" variant="button" :disabled="!output" />
-        </template>
-      </ResultPanel>
-
-      <ResultPanel :title="$t('tools.jsSandbox.logsTitle')" :value="logs.join('\n')" pre-wrap>
-        <template #actions>
-          <CopyBtn :text="logs.join('\n')" variant="button" :disabled="!logs.length" />
-        </template>
-      </ResultPanel>
+      <div class="tool-preview-sticky space-y-4">
+        <ResultPanel :title="$t('tools.jsSandbox.outputTitle')" :value="output" pre-wrap max-height="360px" />
+        <ResultPanel :title="$t('tools.jsSandbox.logsTitle')" :value="logs.join('\n')" pre-wrap max-height="260px" />
+      </div>
     </div>
   </ToolPage>
 </template>

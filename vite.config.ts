@@ -8,8 +8,11 @@ import NuxtUI from '@nuxt/ui/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { visualizer } from 'rollup-plugin-visualizer'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: './',
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.1.0'),
+  },
   plugins: [
     vue(),
     NuxtUI({
@@ -23,9 +26,12 @@ export default defineConfig({
       colorMode: true,
     }),
     tailwindcss(),
-    vueDevTools(),
+    ...(command === 'serve' ? [vueDevTools()] : []),
     VitePWA({
       registerType: 'prompt',
+      devOptions: {
+        enabled: true,
+      },
       manifest: {
         name: 'Web Tools',
         short_name: 'Web Tools',
@@ -59,30 +65,43 @@ export default defineConfig({
         ],
       },
     }),
-    visualizer({
-      open: false,
-      gzipSize: true,
-      brotliSize: true,
-      filename: 'dist/stats.html',
-    }),
+    ...(process.env.ANALYZE === 'true'
+      ? [visualizer({
+          open: false,
+          gzipSize: true,
+          brotliSize: true,
+          filename: 'dist/stats.html',
+        })]
+      : []),
   ],
   resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
+    alias: [
+      { find: '@', replacement: fileURLToPath(new URL('./src', import.meta.url)) },
+      { find: '@iconify/vue', replacement: fileURLToPath(new URL('./node_modules/@iconify/vue/dist/offline.mjs', import.meta.url)) },
+    ],
   },
   build: {
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (id.includes('/src/views/crypto/')) return 'tools-crypto'
-          if (id.includes('/src/views/media/')) return 'tools-media'
-          if (id.includes('/src/views/text/')) return 'tools-text'
-          if (id.includes('/src/views/dev/')) return 'tools-dev'
-          if (id.includes('monaco-editor') || id.includes('/components/MonacoEditor'))
-            return 'vendor-monaco'
+          const normalized = id.replace(/\\/g, '/')
+          if (normalized.includes('node_modules/monaco-editor') || normalized.includes('/components/MonacoEditor')) return 'vendor-monaco'
+          if (normalized.includes('node_modules/pdfjs-dist') || normalized.includes('node_modules/pdf-lib')) return 'vendor-pdf'
+          if (
+            normalized.includes('node_modules/crypto-js') ||
+            normalized.includes('node_modules/jose') ||
+            normalized.includes('node_modules/jsencrypt') ||
+            normalized.includes('node_modules/sm-crypto') ||
+            normalized.includes('node_modules/bcryptjs')
+          ) return 'vendor-crypto'
+          if (normalized.includes('node_modules/@faker-js')) return 'vendor-faker'
+          if (
+            normalized.includes('node_modules/qrcode') ||
+            normalized.includes('node_modules/jsqr') ||
+            normalized.includes('node_modules/browser-image-compression')
+          ) return 'vendor-media'
         },
       },
     },
   },
-})
+}))

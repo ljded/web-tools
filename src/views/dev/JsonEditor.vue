@@ -106,55 +106,55 @@ watch(input, validateJson, { immediate: true })
 
 <template>
   <ToolPage name="json" max-width="6xl">
-    <ToolSection :padding="false">
-      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-default px-4 py-3">
-        <span class="text-sm font-medium text-muted">JSON 编辑器</span>
+    <ToolSection compact>
+      <div class="tool-command-bar justify-between">
         <div class="flex flex-wrap items-center gap-2">
+          <UBadge :color="error ? 'error' : status ? 'success' : 'neutral'" variant="soft" size="sm" class="rounded-full">
+            {{ error ? '格式错误' : status || '等待输入' }}
+          </UBadge>
           <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
-          <UButton color="neutral" variant="ghost" @click="openFind" class="rounded-full text-xs text-primary hover:bg-primary/10">
-            <template #leading><UIcon name="i-lucide-search" class="size-3.5" /></template>搜索
-          </UButton>
-          <UButton color="neutral" variant="ghost" @click="formatJson" class="rounded-full text-xs text-primary hover:bg-primary/10">
-            <template #leading><UIcon name="i-lucide-align-left" class="size-3.5" /></template>格式化
-          </UButton>
-          <UButton color="neutral" variant="ghost" @click="compressJson" class="rounded-full text-xs text-primary hover:bg-primary/10">
-            <template #leading><UIcon name="i-lucide-minimize-2" class="size-3.5" /></template>压缩
-          </UButton>
-          <UButton color="neutral" variant="ghost" @click="escapeJson" class="rounded-full text-xs text-primary hover:bg-primary/10">转义</UButton>
-          <UButton color="neutral" variant="ghost" @click="parseJwt" class="rounded-full text-xs text-primary hover:bg-primary/10">
-            <template #leading><UIcon name="i-lucide-key-round" class="size-3.5" /></template>解析 JWT
-          </UButton>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-search" class="rounded-full" @click="openFind">搜索</UButton>
+          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-align-left" class="rounded-full" @click="formatJson">格式化</UButton>
+          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-minimize-2" class="rounded-full" @click="compressJson">压缩</UButton>
+          <UButton color="neutral" variant="soft" size="sm" class="rounded-full" @click="escapeJson">转义</UButton>
+          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-key-round" class="rounded-full" @click="parseJwt">解析 JWT</UButton>
           <CopyBtn :text="input" variant="button" />
           <UButton
-            color="neutral" variant="ghost"
+            color="primary"
+            variant="soft"
+            size="sm"
             :label="showTree ? '隐藏树视图' : '显示树视图'"
             :icon="showTree ? 'i-lucide-panel-right-close' : 'i-lucide-panel-right-open'"
+            class="rounded-full"
             @click="toggleTree"
-            class="rounded-full text-xs text-primary hover:bg-primary/10"
-            :class="showTree ? 'bg-primary/10' : ''"
           />
         </div>
       </div>
+    </ToolSection>
 
-      <div class="flex flex-1 overflow-visible" style="min-height: 400px">
-        <div class="relative flex flex-1">
+    <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.78fr)]">
+      <ToolSection title="JSON 编辑器" description="格式化、压缩、转义或解析 JWT，校验状态会实时更新。" :padding="false">
+        <div class="h-[calc(100vh-16rem)] min-h-[560px] overflow-hidden rounded-b-[1.75rem]">
           <MonacoEditor ref="monacoRef" v-model="input" language="json" :options="{ wordWrap: 'on', find: { addExtraSpaceOnTop: true, autoFindInSelection: 'never' } }" @blur="saveHistory" />
         </div>
-        <div v-show="showTree" class="hidden w-80 overflow-auto border-l border-default bg-default/50 md:block">
-          <div class="sticky top-0 z-10 border-b border-default bg-elevated px-3 py-2 text-xs font-medium text-muted backdrop-blur">结构预览</div>
-          <div class="p-2">
-            <JsonTree v-if="parsed !== null" :data="parsed" />
-            <UAlert v-else-if="input.trim()" class="m-2" :color="error ? 'error' : 'success'" variant="soft" :icon="error ? 'i-lucide-circle-alert' : 'i-lucide-circle-check'" :description="error || status || '无法解析为 JSON'" />
-            <div v-else class="px-2 py-4 text-xs text-muted">输入 JSON 以查看树形结构</div>
-          </div>
+        <div v-if="error || status" class="hig-divider border-t px-4 py-3">
+          <UBadge :color="error ? 'error' : 'success'" variant="soft" size="sm" class="rounded-full">
+            {{ error || status }}
+          </UBadge>
         </div>
-      </div>
+      </ToolSection>
 
-      <div v-if="error || status" class="border-t border-default px-4 py-2">
-        <UBadge :color="error ? 'error' : 'success'" variant="soft" size="sm">
-          {{ error || status }}
-        </UBadge>
+      <div v-show="showTree" class="tool-preview-sticky">
+        <ToolSection title="结构预览" description="在桌面端固定显示，移动端会排在编辑器下方。">
+          <div class="hig-subtle-surface max-h-[640px] overflow-auto rounded-[1.35rem] border p-3">
+            <JsonTree v-if="parsed !== null" :data="parsed" />
+            <UAlert v-else-if="input.trim()" :color="error ? 'error' : 'success'" variant="soft" :icon="error ? 'i-lucide-circle-alert' : 'i-lucide-circle-check'" :description="error || status || '无法解析为 JSON'" />
+            <div v-else class="px-2 py-4 text-sm text-muted">输入 JSON 以查看树形结构</div>
+          </div>
+        </ToolSection>
       </div>
-    </ToolSection>
+    </div>
   </ToolPage>
 </template>

@@ -1,5 +1,4 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import Home from '@/views/Home.vue'
 import { createToolRoutes } from '@/tools/registry'
 
 const router = createRouter({
@@ -8,7 +7,7 @@ const router = createRouter({
     return { top: 0 }
   },
   routes: [
-    { path: '/', name: 'home', component: Home },
+    { path: '/', name: 'home', component: () => import('@/views/Home.vue') },
     ...createToolRoutes(),
   ],
 })

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useToolState } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
@@ -15,6 +15,8 @@ const { input, history, saveHistory } = useToolState<string, { input: string }>(
     generateLabel: (d) => d.input.slice(0, 40) + (d.input.length > 40 ? '...' : ''),
   },
 })
+
+const selectedResultKey = ref('camel')
 
 function onHistorySelect(item: { data: { input: string } }) {
   input.value = item.data.input
@@ -95,31 +97,64 @@ const results = computed(() => {
     { key: 'reversedLines', value: reverseLines(source) },
   ]
 })
+
+const selectedResult = computed(() => results.value.find((item) => item.key === selectedResultKey.value) ?? results.value[0])
 </script>
 
 <template>
-  <ToolPage name="string" max-width="4xl">
-    <ToolSection :title="$t('tools.string.inputTitle')" :description="$t('tools.string.inputDesc')">
-      <template #actions>
-        <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
-      </template>
-      <UTextarea
-        v-model="input"
-        @blur="saveHistory"
-        :placeholder="$t('tools.string.inputPlaceholder')"
-        :rows="8"
-        class="w-full"
-      />
-    </ToolSection>
+  <ToolPage name="string" max-width="6xl">
+    <div class="tool-workspace">
+      <ToolSection :title="$t('tools.string.inputTitle')" :description="$t('tools.string.inputDesc')">
+        <template #actions>
+          <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
+        </template>
+        <div class="space-y-4">
+          <UTextarea
+            v-model="input"
+            @blur="saveHistory"
+            :placeholder="$t('tools.string.inputPlaceholder')"
+            :rows="10"
+            class="w-full"
+          />
+          <ResultPanel
+            v-if="selectedResult"
+            class="lg:hidden"
+            :title="$t(`tools.string.results.${selectedResult.key}`)"
+            :value="selectedResult.value"
+            pre-wrap
+            compact
+          />
+        </div>
+      </ToolSection>
 
-    <div v-if="results.length" class="space-y-3">
-      <ResultPanel
-        v-for="item in results"
-        :key="item.key"
-        :title="$t(`tools.string.results.${item.key}`)"
-        :value="item.value"
-        pre-wrap
-      />
+      <div class="space-y-4 tool-preview-sticky">
+        <ResultPanel
+          :title="selectedResult ? $t(`tools.string.results.${selectedResult.key}`) : $t('app.result')"
+          :value="selectedResult?.value || ''"
+          pre-wrap
+          max-height="360px"
+        />
+        <UCard
+          v-if="results.length"
+          variant="subtle"
+          :ui="{ root: 'hig-panel rounded-[1.75rem] border', body: 'p-3' }"
+        >
+          <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">{{ $t('tools.string.quickResults') }}</div>
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <UButton
+              v-for="item in results"
+              :key="item.key"
+              :color="selectedResultKey === item.key ? 'primary' : 'neutral'"
+              :variant="selectedResultKey === item.key ? 'soft' : 'ghost'"
+              size="xs"
+              class="justify-start rounded-xl"
+              @click="selectedResultKey = item.key"
+            >
+              {{ $t(`tools.string.results.${item.key}`) }}
+            </UButton>
+          </div>
+        </UCard>
+      </div>
     </div>
   </ToolPage>
 </template>

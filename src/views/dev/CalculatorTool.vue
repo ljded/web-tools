@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import CopyBtn from '@/components/CopyBtn.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
@@ -42,37 +41,48 @@ const keys = [
 </script>
 
 <template>
-  <ToolPage name="calculator" max-width="4xl" icon="i-lucide-calculator">
-    <ToolSection :title="$t('tools.calculator.inputTitle')" :description="$t('tools.calculator.inputDesc')">
-      <UInput v-model="expression" :placeholder="$t('tools.calculator.placeholder')" class="w-full" />
-      <div class="mt-4 space-y-2">
-        <div v-for="(row, rowIndex) in keys" :key="rowIndex" class="grid grid-cols-4 gap-2">
-          <UButton
-            v-for="key in row"
-            :key="key"
-            color="neutral"
-            variant="soft"
-            class="rounded-xl"
-            @click="append(key)"
-          >
-            {{ key }}
-          </UButton>
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <UButton color="neutral" variant="ghost" class="rounded-xl" icon="i-lucide-delete" @click="backspace">
-            {{ $t('tools.calculator.backspace') }}
-          </UButton>
-          <UButton color="error" variant="ghost" class="rounded-xl" icon="i-lucide-eraser" @click="clearAll">
-            {{ $t('tools.calculator.clear') }}
-          </UButton>
-        </div>
-      </div>
-    </ToolSection>
+  <ToolPage name="calculator" max-width="6xl" icon="i-lucide-calculator">
+    <div class="tool-workspace">
+      <ToolSection :title="$t('tools.calculator.inputTitle')" :description="$t('tools.calculator.inputDesc')">
+        <div class="space-y-4">
+          <UInput v-model="expression" :placeholder="$t('tools.calculator.placeholder')" class="w-full font-mono" size="xl" />
 
-    <ResultPanel :title="$t('tools.calculator.resultTitle')" :value="result" :monospace="true">
-      <template #actions>
-        <CopyBtn :text="result" variant="button" :disabled="!result" />
-      </template>
-    </ResultPanel>
+          <ResultPanel
+            class="lg:hidden"
+            :title="$t('tools.calculator.resultTitle')"
+            :value="result"
+            :monospace="true"
+            compact
+          />
+
+          <div class="space-y-2">
+            <div v-for="(row, rowIndex) in keys" :key="rowIndex" class="grid grid-cols-4 gap-2">
+              <UButton
+                v-for="key in row"
+                :key="key"
+                color="neutral"
+                variant="soft"
+                class="rounded-2xl py-3 text-base font-semibold"
+                @click="append(key)"
+              >
+                {{ key }}
+              </UButton>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <UButton color="neutral" variant="ghost" class="rounded-xl" icon="i-lucide-delete" @click="backspace">
+                {{ $t('tools.calculator.backspace') }}
+              </UButton>
+              <UButton color="error" variant="ghost" class="rounded-xl" icon="i-lucide-eraser" @click="clearAll">
+                {{ $t('tools.calculator.clear') }}
+              </UButton>
+            </div>
+          </div>
+        </div>
+      </ToolSection>
+
+      <div class="hidden lg:block tool-preview-sticky">
+        <ResultPanel :title="$t('tools.calculator.resultTitle')" :value="result" :monospace="true" />
+      </div>
+    </div>
   </ToolPage>
 </template>

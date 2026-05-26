@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import CopyBtn from '@/components/CopyBtn.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
 
+const { t } = useI18n()
 const markdown = usePersistedRef(
   'web-tools:markdown:input',
   '# Web Tools\n\n- Local-first\n- Offline-capable\n\n`markdown` preview.',
@@ -100,7 +102,7 @@ function formatMarkdown() {
 }
 
 function insertTemplate() {
-  markdown.value = '# 标题\n\n## 小节\n\n- 条目 1\n- 条目 2\n\n**重点** 和 `代码`。'
+  markdown.value = t('tools.markdown.templateContent')
 }
 
 function clearMarkdown() {
@@ -175,28 +177,32 @@ const renderedHtml = computed(() => {
 
 <template>
   <ToolPage name="markdown" max-width="6xl" icon="i-lucide-file-text">
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div class="tool-workspace">
       <ToolSection :title="$t('tools.markdown.editorTitle')" :description="$t('tools.markdown.editorDesc')" :padding="false">
-        <div class="flex flex-wrap items-center gap-2 border-b border-default px-4 py-3">
-          <UButton color="neutral" variant="ghost" class="rounded-full text-xs" icon="i-lucide-align-left" @click="formatMarkdown">格式化</UButton>
-          <UButton color="neutral" variant="ghost" class="rounded-full text-xs" icon="i-lucide-file-plus" @click="insertTemplate">模板</UButton>
-          <UButton color="neutral" variant="ghost" class="rounded-full text-xs" icon="i-lucide-eraser" @click="clearMarkdown">清空</UButton>
+        <div class="tool-command-bar m-4 justify-between">
+          <div class="flex flex-wrap items-center gap-2">
+            <UButton color="neutral" variant="ghost" class="rounded-full text-xs" icon="i-lucide-align-left" @click="formatMarkdown">{{ $t('app.format') }}</UButton>
+            <UButton color="neutral" variant="ghost" class="rounded-full text-xs" icon="i-lucide-file-plus" @click="insertTemplate">{{ $t('tools.markdown.template') }}</UButton>
+            <UButton color="neutral" variant="ghost" class="rounded-full text-xs" icon="i-lucide-eraser" @click="clearMarkdown">{{ $t('app.clear') }}</UButton>
+          </div>
           <CopyBtn :text="markdown" variant="button" />
         </div>
-        <div class="h-[460px]">
+        <div class="h-[560px] overflow-hidden rounded-b-[1.75rem]">
           <MonacoEditor v-model="markdown" language="markdown" :options="{ wordWrap: 'on', minimap: { enabled: false } }" />
         </div>
       </ToolSection>
 
-      <ToolSection :title="$t('tools.markdown.previewTitle')" :description="$t('tools.markdown.previewDesc')">
-        <template #actions>
-          <CopyBtn :text="markdown" variant="button" />
-        </template>
-        <article
-          class="markdown-preview max-w-none break-words text-default"
-          v-html="renderedHtml"
-        />
-      </ToolSection>
+      <div class="tool-preview-sticky">
+        <ToolSection :title="$t('tools.markdown.previewTitle')" :description="$t('tools.markdown.previewDesc')">
+          <template #actions>
+            <CopyBtn :text="markdown" variant="button" />
+          </template>
+          <article
+            class="markdown-preview hig-subtle-surface max-h-[640px] overflow-auto rounded-[1.35rem] border p-4 break-words text-default sm:p-5"
+            v-html="renderedHtml"
+          />
+        </ToolSection>
+      </div>
     </div>
   </ToolPage>
 </template>

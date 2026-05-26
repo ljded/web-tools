@@ -21,7 +21,7 @@ withDefaults(
     title: undefined,
     hint: '',
     icon: 'i-lucide-file-up',
-    uiBase: 'rounded-3xl border-default/70 bg-default/55 shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5 hover:shadow-md hover:shadow-primary/10',
+    uiBase: 'hig-subtle-surface hig-hover-lift rounded-[1.75rem] border border-dashed shadow-sm transition-all hover:border-primary/45 hover:bg-primary/5 hover:shadow-lg hover:shadow-primary/10',
   },
 )
 

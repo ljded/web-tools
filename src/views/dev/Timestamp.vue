@@ -82,65 +82,93 @@ const diffResult = computed(() => {
 </script>
 
 <template>
-  <ToolPage name="timestamp" max-width="4xl">
-    <ToolSection title="实时时间戳">
-      <ResultPanel title="本地时间" :value="nowDate" color="primary" :monospace="false" compact />
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <ResultPanel title="秒 (s)" :value="String(nowTs)" compact />
-        <ResultPanel title="毫秒 (ms)" :value="String(nowMs)" compact />
-      </div>
-    </ToolSection>
+  <ToolPage name="timestamp" max-width="6xl">
+    <div class="tool-workspace">
+      <div class="space-y-4">
+        <ToolSection title="日期与时间戳转换" description="把常用时间格式、Unix 时间戳和不同时区集中在一个操作面板里。">
+          <div class="space-y-5">
+            <div class="tool-command-bar justify-between">
+              <div>
+                <div class="text-xs font-extrabold uppercase tracking-[0.18em] text-muted">Live Clock</div>
+                <div class="mt-1 text-sm text-muted">{{ nowDate }}</div>
+              </div>
+              <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
+            </div>
 
-    <ToolSection title="日期转时间戳">
-      <div class="flex items-center justify-between mb-3">
-        <span class="text-xs font-medium text-muted">输入日期</span>
-        <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
-      </div>
-      <UInput v-model="dateInput" @blur="saveHistory" placeholder="YYYY-MM-DD HH:mm:ss" class="w-full" />
-      <div v-if="dateTs" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <ResultPanel title="秒" :value="String(dateTs.s)" compact />
-        <ResultPanel title="毫秒" :value="String(dateTs.ms)" compact />
-      </div>
-    </ToolSection>
+            <div class="tool-control-grid">
+              <UFormField label="日期转时间戳" description="支持 YYYY-MM-DD HH:mm:ss 等常见格式。">
+                <UInput v-model="dateInput" @blur="saveHistory" placeholder="YYYY-MM-DD HH:mm:ss" class="w-full" />
+              </UFormField>
+              <UFormField label="时间戳转日期">
+                <div class="flex gap-2">
+                  <UInput v-model="tsInput" placeholder="输入时间戳" class="min-w-0 flex-1" />
+                  <USelect v-model="tsUnit" :items="[{ label: '秒', value: 's' }, { label: '毫秒', value: 'ms' }]" class="w-28" />
+                </div>
+              </UFormField>
+            </div>
+          </div>
+        </ToolSection>
 
-    <ToolSection title="时间戳转日期">
-      <div class="flex flex-wrap items-center gap-3">
-        <UInput v-model="tsInput" placeholder="输入时间戳" class="flex-1" />
-        <USelect v-model="tsUnit" :items="[{ label: '秒', value: 's' }, { label: '毫秒', value: 'ms' }]" />
-      </div>
-      <ResultPanel v-if="tsDate" class="mt-4" title="日期时间" :value="tsDate" compact />
-    </ToolSection>
+        <ToolSection title="时区与差值" description="快速换算固定 UTC 偏移，并计算两个日期之间的跨度。">
+          <div class="space-y-5">
+            <div class="tool-control-grid">
+              <UFormField label="原始时间">
+                <UInput v-model="tzDate" placeholder="YYYY-MM-DD HH:mm:ss" class="w-full" />
+              </UFormField>
+              <UFormField label="从时区">
+                <USelect v-model="tzFrom" :items="timezones.map(tz => ({ label: `${tz.label} (${tz.value})`, value: tz.value }))" class="w-full" />
+              </UFormField>
+              <UFormField label="到时区">
+                <USelect v-model="tzTo" :items="timezones.map(tz => ({ label: `${tz.label} (${tz.value})`, value: tz.value }))" class="w-full" />
+              </UFormField>
+            </div>
 
-    <ToolSection title="时区计算">
-      <div class="flex flex-wrap items-center gap-3">
-        <UInput v-model="tzDate" placeholder="YYYY-MM-DD HH:mm:ss" class="flex-1" />
-        <USelect v-model="tzFrom" :items="timezones.map(tz => ({ label: `${tz.label} (${tz.value})`, value: tz.value }))" />
-        <span class="text-muted">→</span>
-        <USelect v-model="tzTo" :items="timezones.map(tz => ({ label: `${tz.label} (${tz.value})`, value: tz.value }))" />
+            <div class="tool-control-grid">
+              <UFormField label="开始日期">
+                <UInput v-model="diffDate1" type="date" class="w-full" />
+              </UFormField>
+              <UFormField label="结束日期">
+                <UInput v-model="diffDate2" type="date" class="w-full" />
+              </UFormField>
+            </div>
+          </div>
+        </ToolSection>
       </div>
-      <ResultPanel v-if="tzResult" class="mt-4" title="转换后" :value="tzResult" compact />
-    </ToolSection>
 
-    <ToolSection title="日期差值计算器">
-      <div class="flex flex-wrap items-center gap-3">
-        <UInput v-model="diffDate1" type="date" class="w-44" />
-        <span class="text-muted">→</span>
-        <UInput v-model="diffDate2" type="date" class="w-44" />
+      <div class="tool-preview-sticky space-y-4">
+        <ToolSection title="实时结果" compact>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+            <ResultPanel title="本地时间" :value="nowDate" color="primary" :monospace="false" compact />
+            <ResultPanel title="当前秒级时间戳" :value="String(nowTs)" compact />
+            <ResultPanel title="当前毫秒时间戳" :value="String(nowMs)" compact />
+          </div>
+        </ToolSection>
+
+        <ToolSection title="转换输出" compact>
+          <div class="space-y-3">
+            <div v-if="dateTs" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              <ResultPanel title="日期 → 秒" :value="String(dateTs.s)" compact />
+              <ResultPanel title="日期 → 毫秒" :value="String(dateTs.ms)" compact />
+            </div>
+            <ResultPanel v-if="tsDate" title="时间戳 → 日期" :value="tsDate" compact />
+            <ResultPanel v-if="tzResult" title="时区转换" :value="tzResult" compact />
+            <div v-if="diffResult" class="grid grid-cols-3 gap-3">
+              <div class="tool-metric-card text-center">
+                <div class="text-2xl font-bold text-primary">{{ diffResult.days }}</div>
+                <div class="text-xs text-muted">天</div>
+              </div>
+              <div class="tool-metric-card text-center">
+                <div class="text-2xl font-bold text-primary">{{ diffResult.hours }}</div>
+                <div class="text-xs text-muted">小时</div>
+              </div>
+              <div class="tool-metric-card text-center">
+                <div class="text-2xl font-bold text-primary">{{ diffResult.minutes }}</div>
+                <div class="text-xs text-muted">分钟</div>
+              </div>
+            </div>
+          </div>
+        </ToolSection>
       </div>
-      <div v-if="diffResult" class="mt-4 grid grid-cols-3 gap-3">
-        <div class="rounded-xl bg-elevated p-3 text-center">
-          <div class="text-2xl font-bold text-primary">{{ diffResult.days }}</div>
-          <div class="text-xs text-muted">天</div>
-        </div>
-        <div class="rounded-xl bg-elevated p-3 text-center">
-          <div class="text-2xl font-bold text-primary">{{ diffResult.hours }}</div>
-          <div class="text-xs text-muted">小时</div>
-        </div>
-        <div class="rounded-xl bg-elevated p-3 text-center">
-          <div class="text-2xl font-bold text-primary">{{ diffResult.minutes }}</div>
-          <div class="text-xs text-muted">分钟</div>
-        </div>
-      </div>
-    </ToolSection>
+    </div>
   </ToolPage>
 </template>

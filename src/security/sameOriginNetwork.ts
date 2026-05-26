@@ -1,10 +1,30 @@
 const allowedProtocols = new Set(['http:', 'https:', 'data:', 'blob:'])
+const externalFetchAllowances = new Map<string, number>()
+
+function normalizeUrl(input: string | URL): string {
+  return new URL(input, window.location.href).href
+}
 
 function isSameOriginUrl(input: string | URL): boolean {
   const url = input instanceof URL ? input : new URL(input, window.location.href)
   if (!allowedProtocols.has(url.protocol)) return false
   if (url.protocol === 'data:' || url.protocol === 'blob:') return true
   return url.origin === window.location.origin
+}
+
+function consumeExternalFetchAllowance(input: string | URL): boolean {
+  const url = normalizeUrl(input)
+  const count = externalFetchAllowances.get(url) ?? 0
+  if (count <= 0) return false
+  if (count === 1) externalFetchAllowances.delete(url)
+  else externalFetchAllowances.set(url, count - 1)
+  return true
+}
+
+export function allowExternalFetchOnce(input: string | URL) {
+  if (typeof window === 'undefined') return
+  const url = normalizeUrl(input)
+  externalFetchAllowances.set(url, (externalFetchAllowances.get(url) ?? 0) + 1)
 }
 
 function assertSameOrigin(input: string | URL, api: string) {
@@ -23,7 +43,10 @@ export function installSameOriginNetworkGuard() {
   const nativeFetch = window.fetch.bind(window)
   window.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     try {
-      assertSameOrigin(getRequestUrl(input), 'fetch')
+      const url = getRequestUrl(input)
+      if (!isSameOriginUrl(url) && !consumeExternalFetchAllowance(url)) {
+        assertSameOrigin(url, 'fetch')
+      }
     } catch (err) {
       return Promise.reject(err)
     }

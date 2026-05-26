@@ -78,25 +78,41 @@ function generateAll() {
 </script>
 
 <template>
-  <ToolPage name="random" max-width="5xl" icon="i-lucide-dices">
+  <ToolPage name="random" max-width="6xl" icon="i-lucide-dices">
     <template #actions>
-      <UButton color="primary" variant="soft" icon="i-lucide-refresh-cw" @click="generateAll">
+      <UButton color="primary" variant="soft" icon="i-lucide-refresh-cw" class="rounded-full" @click="generateAll">
         全部生成
       </UButton>
     </template>
 
-    <ToolSection compact>
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ToolSection v-for="g in generators" :key="g.key" compact>
-          <div class="mb-3 flex items-center justify-between">
-            <span class="text-sm font-medium text-default">{{ g.label }}</span>
-            <UButton color="neutral" variant="ghost" icon="i-lucide-refresh-cw" @click="generate(g.key)" :disabled="loading[g.key]" class="rounded-full" :class="loading[g.key] ? 'animate-spin' : ''" size="xs" />
+    <ToolSection title="随机数据工作台" description="常用测试数据集中生成，单项刷新后可直接复制。" compact>
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div v-for="g in generators" :key="g.key" class="tool-list-item p-4">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <div class="text-sm font-extrabold text-highlighted">{{ g.label }}</div>
+              <div class="mt-1 text-xs text-muted">{{ g.key }}</div>
+            </div>
+            <UButton
+              color="neutral"
+              variant="ghost"
+              icon="i-lucide-refresh-cw"
+              :aria-label="`生成${g.label}`"
+              :title="`生成${g.label}`"
+              @click="generate(g.key)"
+              :disabled="loading[g.key]"
+              class="rounded-full"
+              :class="loading[g.key] ? 'animate-spin' : ''"
+              size="xs"
+            />
           </div>
           <div class="flex items-center gap-2">
-            <div class="flex-1 truncate rounded-xl bg-elevated px-3 py-2 font-mono text-sm text-default">{{ results[g.key] || '-' }}</div>
+            <div class="min-w-0 flex-1 truncate rounded-2xl bg-elevated/55 px-3 py-2 font-mono text-sm text-default shadow-inner shadow-default/5">
+              {{ results[g.key] || '-' }}
+            </div>
             <CopyBtn v-if="results[g.key] && results[g.key] !== '生成失败'" :text="results[g.key]!" />
           </div>
-        </ToolSection>
+        </div>
       </div>
     </ToolSection>
   </ToolPage>

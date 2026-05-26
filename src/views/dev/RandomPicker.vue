@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import CopyBtn from '@/components/CopyBtn.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
+
+const MAX_RANGE_ITEMS = 10000
 
 const sourceText = usePersistedRef('web-tools:picker:source', 'Apple\nBanana\nOrange\nGrape\nMango')
 const rangeText = usePersistedRef('web-tools:picker:range', '')
@@ -15,22 +16,7 @@ const uniqueOnly = usePersistedRef('web-tools:picker:unique', true)
 const result = ref<string[]>([])
 
 type Reward = { name: string; count: number }
-
-function expandRange(input: string) {
-  const trimmed = input.trim()
-  if (!trimmed) return []
-  const match = trimmed.match(/^(-?\d+)\s*(?:-|~|到|\.\.)\s*(-?\d+)$/)
-  if (!match) return []
-  const start = Number(match[1])
-  const end = Number(match[2])
-  const step = start <= end ? 1 : -1
-  const values: string[] = []
-  for (let current = start; step > 0 ? current <= end : current >= end; current += step) {
-    values.push(String(current))
-    if (values.length >= 10000) break
-  }
-  return values
-}
+type ParsedEntries = { items: string[]; truncated: boolean }
 
 function parseOrderedLine(line: string) {
   return line
@@ -45,10 +31,68 @@ function normalizeLines(text: string) {
     .filter(Boolean)
 }
 
-const excluded = computed(() => new Set(normalizeLines(excludeText.value)))
+function expandRangeToken(token: string, limit: number) {
+  const match = token.trim().match(/^(-?\d+)\s*(?:\.\.|到|~|-)\s*(-?\d+)$/)
+  if (!match || limit <= 0) return null
+
+  const start = Number(match[1])
+  const end = Number(match[2])
+  const step = start <= end ? 1 : -1
+  const values: string[] = []
+  for (let current = start; step > 0 ? current <= end : current >= end; current += step) {
+    values.push(String(current))
+    if (values.length >= limit) break
+  }
+  return {
+    values,
+    truncated: values.at(-1) !== String(end),
+  }
+}
+
+function tokenizeEntry(entry: string) {
+  return entry.match(/-?\d+\s*(?:\.\.|到|~|-)\s*-?\d+|[^\s,，;；、]+/g) ?? []
+}
+
+function parseFlexibleEntries(text: string): ParsedEntries {
+  const items: string[] = []
+  let truncated = false
+  const segments = text
+    .split(/\r?\n|[,，;；、]/)
+    .map(parseOrderedLine)
+    .filter(Boolean)
+
+  for (const segment of segments) {
+    const segmentRange = expandRangeToken(segment, MAX_RANGE_ITEMS - items.length)
+    if (segmentRange) {
+      items.push(...segmentRange.values)
+      truncated ||= segmentRange.truncated
+    } else {
+      for (const token of tokenizeEntry(segment)) {
+        const range = expandRangeToken(token, MAX_RANGE_ITEMS - items.length)
+        if (range) {
+          items.push(...range.values)
+          truncated ||= range.truncated
+        } else {
+          items.push(token.trim())
+        }
+        if (items.length >= MAX_RANGE_ITEMS) {
+          truncated = true
+          break
+        }
+      }
+    }
+    if (items.length >= MAX_RANGE_ITEMS) break
+  }
+
+  return { items: items.filter(Boolean), truncated }
+}
+
+const rangeEntries = computed(() => parseFlexibleEntries(rangeText.value))
+const excludeEntries = computed(() => parseFlexibleEntries(excludeText.value))
+const excluded = computed(() => new Set(excludeEntries.value.items))
 
 const candidates = computed(() => {
-  const source = [...expandRange(rangeText.value), ...normalizeLines(sourceText.value)]
+  const source = [...rangeEntries.value.items, ...normalizeLines(sourceText.value)]
   return source.filter((item, index, arr) => !excluded.value.has(item) && arr.indexOf(item) === index)
 })
 
@@ -77,6 +121,7 @@ function shuffle<T>(list: T[]): T[] {
 }
 
 function pickFromList(list: string[], count: number) {
+  if (!list.length) return []
   if (uniqueOnly.value) return shuffle(list).slice(0, Math.min(count, list.length))
   const picked: string[] = []
   for (let i = 0; i < count; i++) picked.push(list[Math.floor(Math.random() * list.length)]!)
@@ -117,41 +162,79 @@ function clearAll() {
 </script>
 
 <template>
-  <ToolPage name="picker" max-width="4xl" icon="i-lucide-list-checks">
-    <ToolSection :title="$t('tools.picker.inputTitle')" :description="$t('tools.picker.inputDesc')">
-      <UTextarea v-model="sourceText" :rows="8" :placeholder="$t('tools.picker.inputPlaceholder')" class="w-full" />
-      <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <UFormField label="区间候选">
-          <UInput v-model="rangeText" placeholder="如 1-100、1..30、30到1" />
-        </UFormField>
-        <UFormField label="排除选项">
-          <UInput v-model="excludeText" placeholder="用逗号或换行分隔" />
-        </UFormField>
-      </div>
-      <UFormField class="mt-4" label="奖励配置" description="每行一种奖励，格式如：一等奖*1、二等奖*2；留空则使用抽取数量。">
-        <UTextarea v-model="rewardText" :rows="4" placeholder="一等奖*1\n二等奖*2" class="w-full" />
-      </UFormField>
-      <div class="mt-4 flex flex-wrap items-center gap-3">
-        <UFormField :label="$t('tools.picker.pickCount')" class="w-32">
-          <UInput :model-value="pickCount" type="number" :min="1" :max="200" @update:model-value="pickCount = Math.max(1, Math.min(Number($event) || 1, 200))" />
-        </UFormField>
-        <UCheckbox v-model="uniqueOnly" :label="$t('tools.picker.uniqueOnly')" />
-        <UButton color="primary" class="rounded-full" icon="i-lucide-dices" @click="pick">{{ $t('tools.picker.pickNow') }}</UButton>
-        <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-eraser" @click="clearAll">{{ $t('tools.picker.clear') }}</UButton>
-      </div>
-      <div class="mt-3 text-xs text-muted">{{ $t('tools.picker.candidateCount', { count: candidates.length }) }}</div>
-    </ToolSection>
+  <ToolPage name="picker" max-width="6xl" icon="i-lucide-list-checks">
+    <div class="tool-workspace">
+      <div class="space-y-4">
+        <ToolSection :title="$t('tools.picker.inputTitle')" :description="$t('tools.picker.inputDesc')">
+          <div class="space-y-5">
+            <UFormField label="候选名单" description="每行或用逗号分隔一个候选，也可保留自然文本名单。">
+              <UTextarea v-model="sourceText" :rows="7" :placeholder="$t('tools.picker.inputPlaceholder')" class="w-full" />
+            </UFormField>
 
-    <ResultPanel :title="$t('tools.picker.resultTitle')" :value="resultText" pre-wrap>
-      <template #actions>
-        <CopyBtn :text="resultText" variant="button" :disabled="!result.length" />
-      </template>
-      <div v-if="result.length" class="space-y-2">
-        <div v-for="(item, idx) in result" :key="`${item}-${idx}`" class="rounded-xl border border-default/70 bg-elevated/70 px-3 py-2 text-sm text-default">
-          {{ idx + 1 }}. {{ item }}
-        </div>
+            <div class="tool-control-grid">
+              <UFormField label="区间候选" description="支持多个区间：1-5、10..20、30到25，可用逗号或换行分隔。">
+                <UTextarea v-model="rangeText" :rows="5" placeholder="1-5, 10-12\n30到25" class="w-full" />
+              </UFormField>
+              <UFormField label="排除选项" description="可写具体值，也可写区间，例如 2-3、11。">
+                <UTextarea v-model="excludeText" :rows="5" placeholder="2-3, 11\nBanana" class="w-full" />
+              </UFormField>
+            </div>
+
+            <UAlert
+              v-if="rangeEntries.truncated || excludeEntries.truncated"
+              color="warning"
+              variant="soft"
+              icon="i-lucide-triangle-alert"
+              description="区间展开已达到 10000 项上限，超出的部分已忽略。"
+            />
+          </div>
+        </ToolSection>
+
+        <ToolSection title="抽取规则" description="配置抽取数量、是否去重，以及按奖项批量抽取。">
+          <div class="space-y-5">
+            <UFormField label="奖励配置" description="每行一种奖励，格式如：一等奖*1、二等奖*2；留空则使用抽取数量。">
+              <UTextarea v-model="rewardText" :rows="4" placeholder="一等奖*1\n二等奖*2" class="w-full" />
+            </UFormField>
+
+            <div class="tool-command-bar justify-between">
+              <div class="flex flex-wrap items-center gap-3">
+                <UFormField :label="$t('tools.picker.pickCount')" class="w-32">
+                  <UInput :model-value="pickCount" type="number" :min="1" :max="200" class="w-full" @update:model-value="pickCount = Math.max(1, Math.min(Number($event) || 1, 200))" />
+                </UFormField>
+                <UCheckbox v-model="uniqueOnly" :label="$t('tools.picker.uniqueOnly')" />
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <UButton color="primary" class="rounded-full" icon="i-lucide-dices" @click="pick">{{ $t('tools.picker.pickNow') }}</UButton>
+                <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-eraser" @click="clearAll">{{ $t('tools.picker.clear') }}</UButton>
+              </div>
+            </div>
+          </div>
+        </ToolSection>
       </div>
-      <div v-else class="text-sm text-muted">{{ $t('tools.picker.emptyResult') }}</div>
-    </ResultPanel>
+
+      <div class="tool-preview-sticky space-y-4">
+        <ToolSection title="候选概览" compact>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="tool-metric-card">
+              <div class="text-2xl font-black text-highlighted">{{ candidates.length }}</div>
+              <div class="text-xs text-muted">可抽取候选</div>
+            </div>
+            <div class="tool-metric-card">
+              <div class="text-2xl font-black text-highlighted">{{ excluded.size }}</div>
+              <div class="text-xs text-muted">已排除</div>
+            </div>
+          </div>
+        </ToolSection>
+
+        <ResultPanel :title="$t('tools.picker.resultTitle')" :value="resultText" pre-wrap>
+          <div v-if="result.length" class="space-y-2">
+            <div v-for="(item, idx) in result" :key="`${item}-${idx}`" class="tool-list-item px-3 py-2 text-sm text-default">
+              {{ idx + 1 }}. {{ item }}
+            </div>
+          </div>
+          <div v-else class="text-sm text-muted">{{ $t('tools.picker.emptyResult') }}</div>
+        </ResultPanel>
+      </div>
+    </div>
   </ToolPage>
 </template>
