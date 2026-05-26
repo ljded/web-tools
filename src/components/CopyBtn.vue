@@ -33,9 +33,12 @@ async function handleCopy() {
     color="neutral"
     variant="ghost"
     size="xs"
+    :aria-label="copied ? t('app.copied') : t('app.copy')"
+    :title="copied ? t('app.copied') : t('app.copy')"
     :disabled="disabled || !text"
     :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
     :class="[
+      'focus-visible:hig-focus rounded-full',
       variant === 'button'
         ? 'text-primary hover:bg-primary/10'
         : 'text-muted hover:bg-elevated',

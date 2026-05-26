@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { usePreferenceStore } from '@/stores/preference'
 
 defineProps<{
@@ -11,15 +13,16 @@ const emit = defineEmits<{
 }>()
 
 const preference = usePreferenceStore()
-const localeItems = [
-  { label: '中文', value: 'zh-CN' },
-  { label: 'English', value: 'en-US' },
-]
+const { t } = useI18n()
+const localeItems = computed(() => [
+  { label: t('locale.zh'), value: 'zh-CN' },
+  { label: t('locale.en'), value: 'en-US' },
+])
 </script>
 
 <template>
   <header
-    class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-default/70 bg-default/75 px-4 shadow-sm shadow-default/5 backdrop-blur-xl"
+    class="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-3 border-b border-default/55 bg-default/68 px-3 shadow-sm shadow-default/5 backdrop-blur-2xl sm:px-4 lg:h-[4.25rem]"
   >
     <UButton
       icon="i-lucide-menu"
@@ -27,6 +30,8 @@ const localeItems = [
       variant="ghost"
       size="sm"
       class="rounded-full md:hidden"
+      :aria-label="$t('app.openNavigation')"
+      :title="$t('app.openNavigation')"
       :ui="{ base: 'rounded-full focus-visible:hig-focus' }"
       @click="emit('openNavigation')"
     />
@@ -38,10 +43,12 @@ const localeItems = [
       <UButton
         icon="i-lucide-search"
         color="neutral"
-        variant="ghost"
+        variant="soft"
         size="sm"
         class="rounded-full"
-        :ui="{ base: 'rounded-full focus-visible:hig-focus' }"
+        :aria-label="$t('app.openSearch')"
+        :title="$t('app.openSearch')"
+        :ui="{ base: 'rounded-full border border-default/60 bg-elevated/70 px-3 focus-visible:hig-focus' }"
         @click="emit('openSearch')"
       >
         <span class="hidden sm:inline">{{ $t('app.search') }}</span>

@@ -138,8 +138,9 @@ const displayResults = computed(() => {
 </script>
 
 <template>
-  <ToolPage name="hash" max-width="3xl" icon="i-lucide-fingerprint">
-    <ToolSection title="输入内容" description="输入文本或拖拽文件，文件会使用 Worker 分块计算。">
+  <ToolPage name="hash" max-width="6xl" icon="i-lucide-fingerprint">
+    <div class="tool-workspace">
+      <ToolSection title="输入内容" description="输入文本或拖拽文件，文件会使用 Worker 分块计算。">
       <template #actions>
         <HistoryPanel
           :items="history.items.value"
@@ -198,19 +199,37 @@ const displayResults = computed(() => {
         :max="100"
         class="mt-3"
       />
-    </ToolSection>
 
-    <div class="space-y-3">
-      <ResultPanel
-        v-for="item in displayResults"
-        :key="item.name"
-        :title="item.name"
-        :value="item.value"
-        :copyable="!!item.value && !item.value.startsWith('SM3') && !item.value.startsWith('错误')"
-      >
-        <span v-if="isComputing && fileHandler.file.value" class="text-muted">计算中 {{ hashProgress }}%</span>
-        <span v-else>{{ item.value || '等待输入...' }}</span>
-      </ResultPanel>
+        <div v-if="displayResults.length" class="mt-4 space-y-3 lg:hidden">
+          <ResultPanel
+            v-for="item in displayResults"
+            :key="item.name"
+            :title="item.name"
+            :value="item.value"
+            :copyable="!!item.value && !item.value.startsWith('SM3') && !item.value.startsWith('错误')"
+            compact
+          >
+            <span v-if="isComputing && fileHandler.file.value" class="text-muted">计算中 {{ hashProgress }}%</span>
+            <span v-else>{{ item.value || '等待输入...' }}</span>
+          </ResultPanel>
+        </div>
+      </ToolSection>
+
+      <div class="hidden space-y-3 lg:block tool-preview-sticky">
+        <ResultPanel
+          v-for="item in displayResults"
+          :key="item.name"
+          :title="item.name"
+          :value="item.value"
+          :copyable="!!item.value && !item.value.startsWith('SM3') && !item.value.startsWith('错误')"
+          max-height="160px"
+          compact
+        >
+          <span v-if="isComputing && fileHandler.file.value" class="text-muted">计算中 {{ hashProgress }}%</span>
+          <span v-else>{{ item.value || '等待输入...' }}</span>
+        </ResultPanel>
+        <ResultPanel v-if="!displayResults.length" title="结果" value="" empty-text="等待输入..." />
+      </div>
     </div>
   </ToolPage>
 </template>

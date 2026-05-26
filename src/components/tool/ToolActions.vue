@@ -13,9 +13,9 @@ withDefaults(
 
 <template>
   <div
-    class="flex items-center gap-2"
+    class="tool-command-bar min-w-0"
     :class="[
-      wrap ? 'flex-wrap' : 'flex-nowrap',
+      wrap ? 'flex-wrap' : 'flex-nowrap overflow-x-auto',
       align === 'start' ? 'justify-start' : align === 'between' ? 'justify-between' : 'justify-end',
     ]"
   >

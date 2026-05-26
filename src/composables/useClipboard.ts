@@ -11,10 +11,12 @@ export function useClipboard(timeout = 1500) {
       copied.value = true
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => { copied.value = false }, timeout)
-      try {
-        const toast = useToast()
-        toast.add({ title: msg || '已复制到剪贴板', color: 'success', duration: 2000 })
-      } catch { /* toast may not be available in all contexts */ }
+      if (msg) {
+        try {
+          const toast = useToast()
+          toast.add({ title: msg, color: 'success', duration: 2000 })
+        } catch { /* toast may not be available in all contexts */ }
+      }
     }
     return ok
   }

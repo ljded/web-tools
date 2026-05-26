@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { copyToClipboard } from '@/utils/clipboard'
 
 const props = defineProps<{
@@ -9,6 +10,7 @@ const props = defineProps<{
 }>()
 
 const depth = props.depth ?? 0
+const { t, locale } = useI18n()
 const isOpen = ref(depth < 2)
 const copied = ref(false)
 
@@ -49,7 +51,7 @@ const timestampInfo = computed(() => {
     const ms = raw.length === 10 ? num * 1000 : num
     const date = new Date(ms)
     if (Number.isNaN(date.getTime())) return ''
-    return date.toLocaleString('zh-CN')
+    return date.toLocaleString(locale.value)
   }
   return ''
 })
@@ -120,7 +122,7 @@ function valueClass(): string {
         :icon="copied ? 'i-lucide-check' : 'i-lucide-copy'"
         class="ml-auto size-4 shrink-0 p-0 opacity-0 transition-opacity hover:text-primary group-hover:opacity-100"
         :class="copied ? 'text-primary opacity-100' : 'text-muted'"
-        title="复制"
+        :title="t('app.copy')"
       />
     </div>
 

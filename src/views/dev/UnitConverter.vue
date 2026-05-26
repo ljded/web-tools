@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import CopyBtn from '@/components/CopyBtn.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
@@ -36,6 +35,11 @@ const unitMap = {
 } as const
 
 const currentUnits = computed(() => unitMap[category.value])
+const resultMeta = computed(() => {
+  const from = currentUnits.value.find((item) => item.value === fromUnit.value)?.label ?? fromUnit.value
+  const to = currentUnits.value.find((item) => item.value === toUnit.value)?.label ?? toUnit.value
+  return `${inputValue.value || '0'} ${from} → ${to}`
+})
 
 function normalizeUnits() {
   const units = currentUnits.value
@@ -76,42 +80,45 @@ function swapUnits() {
 </script>
 
 <template>
-  <ToolPage name="unit" max-width="4xl" icon="i-lucide-ruler">
-    <ToolSection :title="$t('tools.unit.inputTitle')" :description="$t('tools.unit.inputDesc')">
-      <UFormField :label="$t('tools.unit.category')">
-        <USelect
-          v-model="category"
-          :items="[
-            { label: $t('tools.unit.categories.length'), value: 'length' },
-            { label: $t('tools.unit.categories.weight'), value: 'weight' },
-            { label: $t('tools.unit.categories.temperature'), value: 'temperature' },
-          ]"
-        />
-      </UFormField>
+  <ToolPage name="unit" max-width="6xl" icon="i-lucide-ruler">
+    <div class="tool-workspace">
+      <ToolSection :title="$t('tools.unit.inputTitle')" :description="$t('tools.unit.inputDesc')">
+        <div class="space-y-4">
+          <UFormField :label="$t('tools.unit.value')">
+            <UInput v-model="inputValue" type="number" class="w-full" size="lg" />
+          </UFormField>
 
-      <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr]">
-        <UFormField :label="$t('tools.unit.from')">
-          <USelect v-model="fromUnit" :items="currentUnits.map((item) => ({ label: item.label, value: item.value }))" />
-        </UFormField>
-        <div class="flex items-end justify-center">
-          <UButton color="neutral" variant="ghost" icon="i-lucide-arrow-left-right" class="rounded-full" @click="swapUnits" />
+          <ResultPanel class="lg:hidden" :title="$t('tools.unit.resultTitle')" :value="result" :meta="resultMeta" compact />
+
+          <UFormField :label="$t('tools.unit.category')">
+            <USelect
+              v-model="category"
+              :items="[
+                { label: $t('tools.unit.categories.length'), value: 'length' },
+                { label: $t('tools.unit.categories.weight'), value: 'weight' },
+                { label: $t('tools.unit.categories.temperature'), value: 'temperature' },
+              ]"
+              class="w-full"
+            />
+          </UFormField>
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr]">
+            <UFormField :label="$t('tools.unit.from')">
+              <USelect v-model="fromUnit" :items="currentUnits.map((item) => ({ label: item.label, value: item.value }))" class="w-full" />
+            </UFormField>
+            <div class="flex items-end justify-center">
+              <UButton color="neutral" variant="soft" icon="i-lucide-arrow-left-right" class="rounded-full" @click="swapUnits" />
+            </div>
+            <UFormField :label="$t('tools.unit.to')">
+              <USelect v-model="toUnit" :items="currentUnits.map((item) => ({ label: item.label, value: item.value }))" class="w-full" />
+            </UFormField>
+          </div>
         </div>
-        <UFormField :label="$t('tools.unit.to')">
-          <USelect v-model="toUnit" :items="currentUnits.map((item) => ({ label: item.label, value: item.value }))" />
-        </UFormField>
-      </div>
+      </ToolSection>
 
-      <div class="mt-4">
-        <UFormField :label="$t('tools.unit.value')">
-          <UInput v-model="inputValue" type="number" />
-        </UFormField>
+      <div class="hidden lg:block tool-preview-sticky">
+        <ResultPanel :title="$t('tools.unit.resultTitle')" :value="result" :meta="resultMeta" />
       </div>
-    </ToolSection>
-
-    <ResultPanel :title="$t('tools.unit.resultTitle')" :value="result">
-      <template #actions>
-        <CopyBtn :text="result" variant="button" :disabled="!result" />
-      </template>
-    </ResultPanel>
+    </div>
   </ToolPage>
 </template>

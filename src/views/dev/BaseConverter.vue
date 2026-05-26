@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import CopyBtn from '@/components/CopyBtn.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
@@ -38,29 +37,33 @@ function swapBases() {
 </script>
 
 <template>
-  <ToolPage name="base" max-width="4xl" icon="i-lucide-binary">
-    <ToolSection :title="$t('tools.base.inputTitle')" :description="$t('tools.base.inputDesc')">
-      <UFormField :label="$t('tools.base.inputNumber')">
-        <UInput v-model="input" :placeholder="$t('tools.base.placeholder')" />
-      </UFormField>
+  <ToolPage name="base" max-width="6xl" icon="i-lucide-binary">
+    <div class="tool-workspace">
+      <ToolSection :title="$t('tools.base.inputTitle')" :description="$t('tools.base.inputDesc')">
+        <div class="space-y-4">
+          <UFormField :label="$t('tools.base.inputNumber')">
+            <UInput v-model="input" :placeholder="$t('tools.base.placeholder')" class="w-full font-mono" size="lg" />
+          </UFormField>
 
-      <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr]">
-        <UFormField :label="$t('tools.base.fromBase')">
-          <USelect v-model="fromBase" :items="baseItems" />
-        </UFormField>
-        <div class="flex items-end justify-center">
-          <UButton color="neutral" variant="ghost" icon="i-lucide-arrow-left-right" class="rounded-full" @click="swapBases" />
+          <ResultPanel class="lg:hidden" :title="$t('tools.base.resultTitle')" :value="result" compact />
+
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr]">
+            <UFormField :label="$t('tools.base.fromBase')">
+              <USelect v-model="fromBase" :items="baseItems" class="w-full" />
+            </UFormField>
+            <div class="flex items-end justify-center">
+              <UButton color="neutral" variant="soft" icon="i-lucide-arrow-left-right" class="rounded-full" @click="swapBases" />
+            </div>
+            <UFormField :label="$t('tools.base.toBase')">
+              <USelect v-model="toBase" :items="baseItems" class="w-full" />
+            </UFormField>
+          </div>
         </div>
-        <UFormField :label="$t('tools.base.toBase')">
-          <USelect v-model="toBase" :items="baseItems" />
-        </UFormField>
-      </div>
-    </ToolSection>
+      </ToolSection>
 
-    <ResultPanel :title="$t('tools.base.resultTitle')" :value="result">
-      <template #actions>
-        <CopyBtn :text="result" variant="button" :disabled="!result" />
-      </template>
-    </ResultPanel>
+      <div class="hidden lg:block tool-preview-sticky">
+        <ResultPanel :title="$t('tools.base.resultTitle')" :value="result" />
+      </div>
+    </div>
   </ToolPage>
 </template>

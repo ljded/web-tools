@@ -11,7 +11,9 @@ import RsaWorker from '@/workers/rsa.worker?worker'
 import CryptoWorker from '@/workers/crypto.worker?worker'
 import { createWorkerPool } from '@/workers/pool'
 
-const tab = usePersistedRef<'aes' | 'sm2' | 'rsa' | 'jwt' | 'bcrypt' | 'sm4'>('web-tools:crypto:tab', 'aes')
+type CryptoTab = 'aes' | 'sm2' | 'rsa' | 'jwt' | 'bcrypt' | 'sm4'
+
+const tab = usePersistedRef<CryptoTab>('web-tools:crypto:tab', 'aes')
 const rsaWorkerPool = createWorkerPool(() => new RsaWorker(), { size: 1 })
 const cryptoWorkerPool = createWorkerPool(() => new CryptoWorker(), { size: 2 })
 const MAX_TEXT_CRYPTO_CHARS = 100_000
@@ -24,6 +26,7 @@ const latestBcrypt = useLatestTask()
 const latestSm4 = useLatestTask()
 
 onUnmounted(() => {
+  clearComputeTimers()
   latestAes.cancel()
   latestSm2.cancel()
   latestRsa.cancel()
@@ -35,6 +38,22 @@ onUnmounted(() => {
 })
 
 function isTooLong(text: string, max: number) { return text.length > max }
+
+const computeTimers = new Map<CryptoTab, ReturnType<typeof setTimeout>>()
+
+function scheduleCompute(target: CryptoTab, fn: () => void | Promise<void>) {
+  const existing = computeTimers.get(target)
+  if (existing) clearTimeout(existing)
+  computeTimers.set(target, setTimeout(() => {
+    computeTimers.delete(target)
+    void fn()
+  }, 220))
+}
+
+function clearComputeTimers() {
+  for (const timer of computeTimers.values()) clearTimeout(timer)
+  computeTimers.clear()
+}
 
 // AES
 const aesText = usePersistedRef('web-tools:crypto:aes-text', 'Hello World')
@@ -56,7 +75,7 @@ async function computeAes() {
   catch (e: any) { if (isCurrent()) { aesError.value = e?.message || 'AES 操作失败'; aesResult.value = '' } }
   finally { if (isCurrent()) aesLoading.value = false; lease.release() }
 }
-watch([aesText, aesKey, aesMode], () => computeAes(), { immediate: true })
+watch([aesText, aesKey, aesMode], () => { if (tab.value === 'aes') scheduleCompute('aes', computeAes) })
 
 // SM2
 const sm2Text = usePersistedRef('web-tools:crypto:sm2-text', 'Hello SM2')
@@ -86,7 +105,7 @@ async function computeSm2() {
   catch (e: any) { if (isCurrent()) { sm2Error.value = e?.message || 'SM2 操作失败'; sm2Result.value = '' } }
   finally { if (isCurrent()) sm2Loading.value = false; lease.release() }
 }
-watch([sm2Text, sm2Mode], () => computeSm2())
+watch([sm2Text, sm2Mode], () => { if (tab.value === 'sm2') scheduleCompute('sm2', computeSm2) })
 
 // RSA
 const rsaText = usePersistedRef('web-tools:crypto:rsa-text', 'Hello RSA')
@@ -116,7 +135,7 @@ async function computeRsa() {
   catch (e: any) { if (isCurrent()) { rsaError.value = e?.message || 'RSA 操作失败'; rsaResult.value = '' } }
   finally { if (isCurrent()) rsaLoading.value = false; lease.release() }
 }
-watch([rsaText, rsaMode], () => computeRsa())
+watch([rsaText, rsaMode], () => { if (tab.value === 'rsa') scheduleCompute('rsa', computeRsa) })
 
 // JWT
 const jwtText = usePersistedRef('web-tools:crypto:jwt-text', 'Hello JWT')
@@ -144,7 +163,7 @@ async function computeJwt() {
     finally { lease.release() }
   }
 }
-watch([jwtText, jwtSecret, jwtMode], () => computeJwt())
+watch([jwtText, jwtSecret, jwtMode], () => { if (tab.value === 'jwt') scheduleCompute('jwt', computeJwt) })
 
 // Bcrypt
 const bcryptText = usePersistedRef('web-tools:crypto:bcrypt-text', 'MyPassword123')
@@ -192,7 +211,17 @@ async function computeSm4() {
   catch (e: any) { if (isCurrent()) { sm4Error.value = e?.message || 'SM4 操作失败'; sm4Result.value = '' } }
   finally { lease.release() }
 }
-watch([sm4Text, sm4Key, sm4Mode], () => computeSm4(), { immediate: true })
+watch([sm4Text, sm4Key, sm4Mode], () => { if (tab.value === 'sm4') scheduleCompute('sm4', computeSm4) })
+
+function computeActiveTab() {
+  if (tab.value === 'aes') void computeAes()
+  else if (tab.value === 'sm4') void computeSm4()
+  else if (tab.value === 'sm2') void computeSm2()
+  else if (tab.value === 'rsa') void computeRsa()
+  else if (tab.value === 'jwt') void computeJwt()
+}
+
+watch(tab, () => computeActiveTab(), { immediate: true })
 
 const tabsConfig = [
   { key: 'aes' as const, label: 'AES', icon: 'i-lucide-lock' },
@@ -205,7 +234,7 @@ const tabsConfig = [
 </script>
 
 <template>
-  <ToolPage name="crypto" max-width="4xl">
+  <ToolPage name="crypto" max-width="6xl">
     <!-- 顶层 Tab 切换 -->
     <UTabs
       v-model="tab"
@@ -227,21 +256,25 @@ const tabsConfig = [
           :items="[{ label: '加密', value: 'encrypt', icon: 'i-lucide-lock' }, { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' }]"
           color="primary"
         />
-        <div class="space-y-5 p-6">
-          <UFormField label="密钥">
-            <UInput v-model="aesKey" placeholder="输入加密密钥..." class="w-full" />
-          </UFormField>
-          <UFormField :label="aesMode === 'encrypt' ? '明文' : '密文'">
-            <UTextarea
-              v-model="aesText"
-              @blur="saveAesHistory"
-              :placeholder="aesMode === 'encrypt' ? '输入要加密的内容...' : '输入要解密的内容...'"
-              :rows="9"
-              class="w-full"
-            />
-          </UFormField>
-          <UAlert v-if="aesError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="aesError" />
-          <ResultPanel v-if="aesResult" title="结果" :value="aesResult" color="primary" />
+        <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.85fr)] lg:items-start">
+          <div class="space-y-5">
+            <UFormField label="密钥">
+              <UInput v-model="aesKey" placeholder="输入加密密钥..." class="w-full" />
+            </UFormField>
+            <UFormField :label="aesMode === 'encrypt' ? '明文' : '密文'">
+              <UTextarea
+                v-model="aesText"
+                @blur="saveAesHistory"
+                :placeholder="aesMode === 'encrypt' ? '输入要加密的内容...' : '输入要解密的内容...'"
+                :rows="9"
+                class="w-full"
+              />
+            </UFormField>
+            <UAlert v-if="aesError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="aesError" />
+          </div>
+          <div class="tool-preview-sticky">
+            <ResultPanel title="结果" :value="aesResult" color="primary" max-height="420px" />
+          </div>
         </div>
       </ToolSection>
     </div>
@@ -257,15 +290,19 @@ const tabsConfig = [
           :items="[{ label: '加密', value: 'encrypt', icon: 'i-lucide-lock' }, { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' }]"
           color="primary"
         />
-        <div class="space-y-5 p-6">
-          <UFormField label="密钥 (16 字节)">
-            <UInput v-model="sm4Key" placeholder="如：1234567890abcdef" class="w-full font-mono" />
-          </UFormField>
-          <UFormField :label="sm4Mode === 'encrypt' ? '明文' : '密文'">
-            <UTextarea v-model="sm4Text" @blur="saveSm4History" :placeholder="sm4Mode === 'encrypt' ? '输入要加密的内容...' : '输入要解密的内容...'" :rows="9" class="w-full" />
-          </UFormField>
-          <UAlert v-if="sm4Error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="sm4Error" />
-          <ResultPanel v-if="sm4Result" title="结果" :value="sm4Result" color="secondary" />
+        <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.85fr)] lg:items-start">
+          <div class="space-y-5">
+            <UFormField label="密钥 (16 字节)">
+              <UInput v-model="sm4Key" placeholder="如：1234567890abcdef" class="w-full font-mono" />
+            </UFormField>
+            <UFormField :label="sm4Mode === 'encrypt' ? '明文' : '密文'">
+              <UTextarea v-model="sm4Text" @blur="saveSm4History" :placeholder="sm4Mode === 'encrypt' ? '输入要加密的内容...' : '输入要解密的内容...'" :rows="9" class="w-full" />
+            </UFormField>
+            <UAlert v-if="sm4Error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="sm4Error" />
+          </div>
+          <div class="tool-preview-sticky">
+            <ResultPanel title="结果" :value="sm4Result" color="secondary" max-height="420px" />
+          </div>
         </div>
       </ToolSection>
     </div>
@@ -281,24 +318,28 @@ const tabsConfig = [
           :items="[{ label: '加密', value: 'encrypt', icon: 'i-lucide-lock' }, { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' }]"
           color="primary"
         />
-        <div class="space-y-5 p-6">
-          <div class="flex items-center justify-between rounded-xl bg-warning/10 px-4 py-3">
-            <span class="text-sm text-warning"><UIcon name="i-lucide-key-round" class="inline size-4" /> 密钥对</span>
-            <UButton color="warning" size="sm" icon="i-lucide-refresh-cw" @click="genRsaKeys" class="rounded-lg px-3 py-2 text-xs font-medium">生成密钥对</UButton>
-          </div>
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField label="公钥">
-              <UTextarea v-model="rsaPubKey" placeholder="粘贴公钥..." :rows="7" class="w-full font-mono text-xs" />
+        <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.85fr)] lg:items-start">
+          <div class="space-y-5">
+            <div class="flex items-center justify-between rounded-xl bg-warning/10 px-4 py-3">
+              <span class="text-sm text-warning"><UIcon name="i-lucide-key-round" class="inline size-4" /> 密钥对</span>
+              <UButton color="warning" size="sm" icon="i-lucide-refresh-cw" @click="genRsaKeys" class="rounded-lg px-3 py-2 text-xs font-medium">生成密钥对</UButton>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UFormField label="公钥">
+                <UTextarea v-model="rsaPubKey" placeholder="粘贴公钥..." :rows="7" class="w-full font-mono text-xs" />
+              </UFormField>
+              <UFormField label="私钥">
+                <UTextarea v-model="rsaPriKey" placeholder="粘贴私钥..." :rows="7" class="w-full font-mono text-xs" />
+              </UFormField>
+            </div>
+            <UFormField :label="rsaMode === 'encrypt' ? '明文' : '密文'">
+              <UTextarea v-model="rsaText" @blur="saveRsaHistory" placeholder="输入内容..." :rows="7" class="w-full" />
             </UFormField>
-            <UFormField label="私钥">
-              <UTextarea v-model="rsaPriKey" placeholder="粘贴私钥..." :rows="7" class="w-full font-mono text-xs" />
-            </UFormField>
+            <UAlert v-if="rsaError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="rsaError" />
           </div>
-          <UFormField :label="rsaMode === 'encrypt' ? '明文' : '密文'">
-            <UTextarea v-model="rsaText" @blur="saveRsaHistory" placeholder="输入内容..." :rows="7" class="w-full" />
-          </UFormField>
-          <UAlert v-if="rsaError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="rsaError" />
-          <ResultPanel v-if="rsaResult" title="结果" :value="rsaResult" color="primary" />
+          <div class="tool-preview-sticky">
+            <ResultPanel title="结果" :value="rsaResult" color="primary" max-height="420px" />
+          </div>
         </div>
       </ToolSection>
     </div>
@@ -309,34 +350,38 @@ const tabsConfig = [
         <template #actions>
           <HistoryPanel :items="sm2History.items.value" @select="onSm2HistorySelect" @remove="sm2History.remove" @clear="sm2History.clear" />
         </template>
-        <div class="flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3">
-          <span class="text-sm text-primary"><UIcon name="i-lucide-key-round" class="inline size-4" /> 密钥对</span>
-          <UButton color="primary" size="sm" icon="i-lucide-refresh-cw" @click="genSm2Keys" class="rounded-lg px-3 py-2 text-xs font-medium">生成密钥对</UButton>
-        </div>
-        <div class="space-y-5 p-6">
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UFormField label="公钥">
-              <UTextarea v-model="sm2PubKey" placeholder="粘贴公钥..." :rows="7" class="w-full font-mono text-xs" />
+        <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.85fr)] lg:items-start">
+          <div class="space-y-5">
+            <div class="flex items-center justify-between rounded-xl bg-primary/10 px-4 py-3">
+              <span class="text-sm text-primary"><UIcon name="i-lucide-key-round" class="inline size-4" /> 密钥对</span>
+              <UButton color="primary" size="sm" icon="i-lucide-refresh-cw" @click="genSm2Keys" class="rounded-lg px-3 py-2 text-xs font-medium">生成密钥对</UButton>
+            </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UFormField label="公钥">
+                <UTextarea v-model="sm2PubKey" placeholder="粘贴公钥..." :rows="7" class="w-full font-mono text-xs" />
+              </UFormField>
+              <UFormField label="私钥">
+                <UTextarea v-model="sm2PriKey" placeholder="粘贴私钥..." :rows="7" class="w-full font-mono text-xs" />
+              </UFormField>
+            </div>
+            <UTabs
+              v-model="sm2Mode"
+              :items="[
+                { label: '加密', value: 'encrypt', icon: 'i-lucide-lock' },
+                { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' },
+                { label: '签名', value: 'sign', icon: 'i-lucide-pen-line' },
+                { label: '验签', value: 'verify', icon: 'i-lucide-shield-check' }
+              ]"
+              color="primary"
+            />
+            <UFormField :label="sm2Mode === 'encrypt' || sm2Mode === 'sign' ? '输入' : '密文/签名值'">
+              <UTextarea v-model="sm2Text" @blur="saveSm2History" placeholder="输入内容..." :rows="7" class="w-full" />
             </UFormField>
-            <UFormField label="私钥">
-              <UTextarea v-model="sm2PriKey" placeholder="粘贴私钥..." :rows="7" class="w-full font-mono text-xs" />
-            </UFormField>
+            <UAlert v-if="sm2Error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="sm2Error" />
           </div>
-          <UTabs
-            v-model="sm2Mode"
-            :items="[
-              { label: '加密', value: 'encrypt', icon: 'i-lucide-lock' },
-              { label: '解密', value: 'decrypt', icon: 'i-lucide-unlock' },
-              { label: '签名', value: 'sign', icon: 'i-lucide-pen-line' },
-              { label: '验签', value: 'verify', icon: 'i-lucide-shield-check' }
-            ]"
-            color="primary"
-          />
-          <UFormField :label="sm2Mode === 'encrypt' || sm2Mode === 'sign' ? '输入' : '密文/签名值'">
-            <UTextarea v-model="sm2Text" @blur="saveSm2History" placeholder="输入内容..." :rows="7" class="w-full" />
-          </UFormField>
-          <UAlert v-if="sm2Error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="sm2Error" />
-          <ResultPanel v-if="sm2Result" title="结果" :value="sm2Result" color="primary" :copyable="!sm2Result.startsWith('✅') && !sm2Result.startsWith('❌')" />
+          <div class="tool-preview-sticky">
+            <ResultPanel title="结果" :value="sm2Result" color="primary" :copyable="!sm2Result.startsWith('✅') && !sm2Result.startsWith('❌')" max-height="420px" />
+          </div>
         </div>
       </ToolSection>
     </div>
@@ -352,15 +397,19 @@ const tabsConfig = [
           :items="[{ label: '编码', value: 'encode', icon: 'i-lucide-lock' }, { label: '解码', value: 'decode', icon: 'i-lucide-unlock' }]"
           color="primary"
         />
-        <div class="space-y-5 p-6">
-          <UFormField label="密钥">
-            <UInput v-model="jwtSecret" placeholder="输入 JWT 密钥..." class="w-full" />
-          </UFormField>
-          <UFormField :label="jwtMode === 'encode' ? '载荷 (JSON)' : 'Token'">
-            <UTextarea v-model="jwtText" @blur="saveJwtHistory" :placeholder="jwtMode === 'encode' ? '输入 JSON payload...' : '输入 JWT Token...'" :rows="7" class="w-full" />
-          </UFormField>
-          <UAlert v-if="jwtError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="jwtError" />
-          <ResultPanel v-if="jwtResult" title="结果" :value="jwtResult" color="primary" pre-wrap />
+        <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.85fr)] lg:items-start">
+          <div class="space-y-5">
+            <UFormField label="密钥">
+              <UInput v-model="jwtSecret" placeholder="输入 JWT 密钥..." class="w-full" />
+            </UFormField>
+            <UFormField :label="jwtMode === 'encode' ? '载荷 (JSON)' : 'Token'">
+              <UTextarea v-model="jwtText" @blur="saveJwtHistory" :placeholder="jwtMode === 'encode' ? '输入 JSON payload...' : '输入 JWT Token...'" :rows="7" class="w-full" />
+            </UFormField>
+            <UAlert v-if="jwtError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="jwtError" />
+          </div>
+          <div class="tool-preview-sticky">
+            <ResultPanel title="结果" :value="jwtResult" color="primary" pre-wrap max-height="420px" />
+          </div>
         </div>
       </ToolSection>
     </div>
@@ -368,22 +417,26 @@ const tabsConfig = [
     <!-- Bcrypt -->
     <div v-if="tab === 'bcrypt'" class="space-y-5">
       <ToolSection title="Bcrypt 哈希" description="密码哈希与验证">
-        <div class="space-y-5 p-6">
-          <UFormField label="密码">
-            <UInput v-model="bcryptText" placeholder="输入密码..." class="w-full" />
-          </UFormField>
-          <UButton color="primary" @click="computeBcrypt" :disabled="bcryptLoading" class="rounded-xl py-3">
-            <template #leading><UIcon v-if="!bcryptLoading" name="i-lucide-sparkles" class="size-4" /></template>
-            {{ bcryptLoading ? '计算中...' : '计算哈希' }}
-          </UButton>
-          <UAlert v-if="bcryptError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="bcryptError" />
-          <ResultPanel v-if="bcryptHash" title="哈希结果" :value="bcryptHash" color="success" />
-          <USeparator label="验证" />
-          <div class="space-y-3">
-            <UFormField label="哈希值">
-              <UInput v-model="bcryptCompare" placeholder="输入哈希值进行比对..." class="w-full" />
+        <div class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(22rem,0.85fr)] lg:items-start">
+          <div class="space-y-5">
+            <UFormField label="密码">
+              <UInput v-model="bcryptText" placeholder="输入密码..." class="w-full" />
             </UFormField>
-            <UButton color="primary" @click="verifyBcrypt" class="rounded-xl">验证</UButton>
+            <UButton color="primary" @click="computeBcrypt" :disabled="bcryptLoading" class="rounded-xl py-3">
+              <template #leading><UIcon v-if="!bcryptLoading" name="i-lucide-sparkles" class="size-4" /></template>
+              {{ bcryptLoading ? '计算中...' : '计算哈希' }}
+            </UButton>
+            <UAlert v-if="bcryptError" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="bcryptError" />
+            <USeparator label="验证" />
+            <div class="space-y-3">
+              <UFormField label="哈希值">
+                <UInput v-model="bcryptCompare" placeholder="输入哈希值进行比对..." class="w-full" />
+              </UFormField>
+              <UButton color="primary" @click="verifyBcrypt" class="rounded-xl">验证</UButton>
+            </div>
+          </div>
+          <div class="space-y-3 tool-preview-sticky">
+            <ResultPanel title="哈希结果" :value="bcryptHash" color="success" max-height="260px" />
             <UAlert v-if="bcryptResult === '密码匹配'" color="success" variant="subtle" icon="i-lucide-shield-check" :title="bcryptResult" />
             <UAlert v-else-if="bcryptResult" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="bcryptResult" />
           </div>

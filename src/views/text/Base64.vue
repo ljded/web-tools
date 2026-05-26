@@ -189,8 +189,9 @@ onUnmounted(() => cleanupPreview())
 </script>
 
 <template>
-  <ToolPage name="base64" max-width="3xl" icon="i-lucide-binary">
-    <ToolSection title="输入" description="选择编码或解码模式，支持文本和文件输入。">
+  <ToolPage name="base64" max-width="6xl" icon="i-lucide-binary">
+    <div class="tool-workspace">
+      <ToolSection title="输入" description="选择编码或解码模式，支持文本和文件输入。">
       <template #actions>
         <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
       </template>
@@ -245,10 +246,18 @@ onUnmounted(() => cleanupPreview())
           <img :src="imgPreview" class="max-h-64 max-w-full rounded-lg object-contain" @error="onImgError" />
         </div>
       </div>
-    </ToolSection>
 
-    <ResultPanel v-if="finalResult" title="结果" :value="finalResult" pre-wrap>
-      {{ resultDisplay }}
-    </ResultPanel>
+        <ResultPanel v-if="finalResult" class="mt-4 lg:hidden" title="结果" :value="finalResult" pre-wrap compact max-height="260px">
+          {{ resultDisplay }}
+        </ResultPanel>
+      </ToolSection>
+
+      <div class="hidden lg:block tool-preview-sticky">
+        <ResultPanel v-if="finalResult" title="结果" :value="finalResult" pre-wrap max-height="520px">
+          {{ resultDisplay }}
+        </ResultPanel>
+        <ResultPanel v-else title="结果" value="" empty-text="等待输入..." />
+      </div>
+    </div>
   </ToolPage>
 </template>

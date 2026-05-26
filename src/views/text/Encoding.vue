@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useToolState } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
-import gbk from 'gbk.js'
 
 const MAX_ENCODING_CHARS = 500_000
 
@@ -28,7 +27,10 @@ function onHistorySelect(item: { data: { mode: 'to' | 'from'; input: string } })
   input.value = item.data.input
 }
 
-function updateResults() {
+let updateSeq = 0
+
+async function updateResults() {
+  const seq = ++updateSeq
   const txt = input.value
   if (!txt) { results.value = []; notice.value = ''; return }
   if (txt.length > MAX_ENCODING_CHARS) {
@@ -37,6 +39,9 @@ function updateResults() {
     return
   }
   notice.value = ''
+
+  const { default: gbk } = await import('gbk.js')
+  if (seq !== updateSeq) return
 
   if (mode.value === 'to') {
     const utf8Bytes = new TextEncoder().encode(txt)
@@ -84,13 +89,15 @@ function updateResults() {
   } catch { /* ignore */ }
   try { decoded.push({ name: 'Escape 解码', value: unescape(txt) }) } catch { /* ignore */ }
 
-  results.value = decoded.length ? decoded : [{ name: '提示', value: '未能识别编码格式，请尝试其他输入' }]
+  if (seq === updateSeq) {
+    results.value = decoded.length ? decoded : [{ name: '提示', value: '未能识别编码格式，请尝试其他输入' }]
+  }
 }
 
 let updateTimer: ReturnType<typeof setTimeout> | null = null
 watch([input, mode], () => {
   if (updateTimer) clearTimeout(updateTimer)
-  updateTimer = setTimeout(updateResults, 180)
+  updateTimer = setTimeout(() => { void updateResults() }, 180)
 }, { immediate: true })
 
 function getUtf16Hex(txt: string): string {
@@ -100,11 +107,14 @@ function getUtf16Hex(txt: string): string {
   }
   return out.join(' ')
 }
+
+const primaryResult = computed(() => results.value[0])
 </script>
 
 <template>
-  <ToolPage name="encoding" max-width="3xl" icon="i-lucide-languages">
-    <ToolSection title="输入" description="选择转换方向后输入文本或编码内容。">
+  <ToolPage name="encoding" max-width="6xl" icon="i-lucide-languages">
+    <div class="tool-workspace">
+      <ToolSection title="输入" description="选择转换方向后输入文本或编码内容。">
       <template #actions>
         <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
       </template>
@@ -120,11 +130,28 @@ function getUtf16Hex(txt: string): string {
         :rows="8"
         class="w-full"
       />
-      <UAlert v-if="notice" class="mt-3" color="warning" variant="soft" icon="i-lucide-triangle-alert" :description="notice" />
-    </ToolSection>
+        <UAlert v-if="notice" class="mt-3" color="warning" variant="soft" icon="i-lucide-triangle-alert" :description="notice" />
+        <ResultPanel
+          v-if="primaryResult"
+          class="mt-4 lg:hidden"
+          :title="primaryResult.name"
+          :value="primaryResult.value"
+          max-height="220px"
+          compact
+        />
+      </ToolSection>
 
-    <div class="space-y-3">
-      <ResultPanel v-for="item in results" :key="item.name" :title="item.name" :value="item.value" />
+      <div class="hidden space-y-3 lg:block tool-preview-sticky">
+        <ResultPanel
+          v-for="item in results"
+          :key="item.name"
+          :title="item.name"
+          :value="item.value"
+          max-height="180px"
+          compact
+        />
+        <ResultPanel v-if="!results.length" title="结果" value="" empty-text="等待输入..." />
+      </div>
     </div>
   </ToolPage>
 </template>

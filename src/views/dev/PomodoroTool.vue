@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import ResultPanel from '@/components/ResultPanel.vue'
+import { useReminder } from '@/composables/useReminder'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
@@ -12,10 +13,13 @@ const breakMinutes = usePersistedRef('web-tools:pomodoro:break-minutes', 5)
 const phase = usePersistedRef<Phase>('web-tools:pomodoro:phase', 'work')
 const cycleCount = usePersistedRef('web-tools:pomodoro:cycle-count', 0)
 const remainingSeconds = usePersistedRef('web-tools:pomodoro:remaining-seconds', 25 * 60)
+const deadlineAt = usePersistedRef<number | null>('web-tools:pomodoro:deadline-at', null)
 const running = usePersistedRef('web-tools:pomodoro:running', false)
 const fullscreen = ref(false)
+const { notify, primeAudio } = useReminder()
 
 let timer: ReturnType<typeof setInterval> | null = null
+let switchingPhase = false
 
 const currentPhaseSeconds = computed(() => (phase.value === 'work' ? workMinutes.value * 60 : breakMinutes.value * 60))
 
@@ -41,107 +45,179 @@ function resetPhaseSeconds() {
   remainingSeconds.value = currentPhaseSeconds.value
 }
 
-function switchPhase() {
-  if (phase.value === 'work') {
-    phase.value = 'break'
-    cycleCount.value += 1
-  } else {
-    phase.value = 'work'
+function remindPhaseEnd(completedPhase: Phase) {
+  notify({
+    title: completedPhase === 'work' ? '专注结束' : '休息结束',
+    description: completedPhase === 'work' ? '可以休息一下了。' : '开始下一轮专注吧。',
+    color: completedPhase === 'work' ? 'success' : 'primary',
+    icon: completedPhase === 'work' ? 'i-lucide-coffee' : 'i-lucide-timer-reset',
+  })
+}
+
+async function switchPhase(shouldNotify = false) {
+  if (switchingPhase) return
+  switchingPhase = true
+  const completedPhase = phase.value
+  try {
+    if (phase.value === 'work') {
+      phase.value = 'break'
+      cycleCount.value += 1
+    } else {
+      phase.value = 'work'
+    }
+    await nextTick()
+    resetPhaseSeconds()
+    deadlineAt.value = running.value ? Date.now() + remainingSeconds.value * 1000 : null
+    if (shouldNotify) remindPhaseEnd(completedPhase)
+  } finally {
+    switchingPhase = false
   }
-  resetPhaseSeconds()
+}
+
+function reconcileTime() {
+  if (!running.value) return
+  if (!deadlineAt.value) {
+    deadlineAt.value = Date.now() + remainingSeconds.value * 1000
+  }
+
+  const nextRemaining = Math.max(0, Math.ceil((deadlineAt.value - Date.now()) / 1000))
+  remainingSeconds.value = nextRemaining
+  if (nextRemaining <= 0) {
+    void switchPhase(true)
+  }
 }
 
 function startTick() {
   stopTick()
-  timer = setInterval(() => {
-    if (!running.value) return
-    if (remainingSeconds.value <= 0) {
-      switchPhase()
-      return
-    }
-    remainingSeconds.value -= 1
-  }, 1000)
+  if (!deadlineAt.value) {
+    deadlineAt.value = Date.now() + Math.max(remainingSeconds.value, 1) * 1000
+  }
+  reconcileTime()
+  if (!running.value) return
+  timer = setInterval(reconcileTime, 500)
 }
 
 function applyWorkMinutes(value: number) {
   workMinutes.value = Math.max(1, Math.min(Number(value) || 25, 180))
-  if (phase.value === 'work') resetPhaseSeconds()
+  if (phase.value !== 'work') return
+  resetPhaseSeconds()
+  deadlineAt.value = running.value ? Date.now() + remainingSeconds.value * 1000 : null
 }
 
 function applyBreakMinutes(value: number) {
   breakMinutes.value = Math.max(1, Math.min(Number(value) || 5, 60))
-  if (phase.value === 'break') resetPhaseSeconds()
+  if (phase.value !== 'break') return
+  resetPhaseSeconds()
+  deadlineAt.value = running.value ? Date.now() + remainingSeconds.value * 1000 : null
 }
 
 function toggle() {
-  running.value = !running.value
-  if (running.value) startTick()
-  else stopTick()
+  if (running.value) {
+    reconcileTime()
+    running.value = false
+    deadlineAt.value = null
+    stopTick()
+    return
+  }
+
+  if (remainingSeconds.value <= 0) resetPhaseSeconds()
+  running.value = true
+  deadlineAt.value = Date.now() + remainingSeconds.value * 1000
+  void primeAudio()
+  startTick()
 }
 
 function skipPhase() {
-  switchPhase()
+  void switchPhase(false)
 }
 
 function resetAll() {
   running.value = false
+  deadlineAt.value = null
   phase.value = 'work'
   cycleCount.value = 0
   remainingSeconds.value = workMinutes.value * 60
   stopTick()
 }
 
-if (running.value) startTick()
+function handleVisibilityChange() {
+  if (!document.hidden) reconcileTime()
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  if (running.value) startTick()
+})
 
 onUnmounted(() => {
   stopTick()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>
 
 <template>
-  <ToolPage name="pomodoro" max-width="4xl" icon="i-lucide-timer-reset">
-    <ToolSection :title="$t('tools.pomodoro.config')">
-      <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <UFormField :label="$t('tools.pomodoro.workMinutes')">
-          <UInput :model-value="workMinutes" type="number" :min="1" :max="180" @update:model-value="applyWorkMinutes(Number($event))" />
-        </UFormField>
-        <UFormField :label="$t('tools.pomodoro.breakMinutes')">
-          <UInput :model-value="breakMinutes" type="number" :min="1" :max="60" @update:model-value="applyBreakMinutes(Number($event))" />
-        </UFormField>
-      </div>
-    </ToolSection>
+  <ToolPage name="pomodoro" max-width="6xl" icon="i-lucide-timer-reset">
+    <div class="tool-workspace">
+      <div class="space-y-4">
+        <ToolSection :title="$t('tools.pomodoro.config')" description="设置专注与休息时长，阶段状态和提醒信息始终在右侧可见。">
+          <div class="space-y-5">
+            <div class="tool-control-grid">
+              <UFormField :label="$t('tools.pomodoro.workMinutes')">
+                <UInput :model-value="workMinutes" type="number" :min="1" :max="180" class="w-full" @update:model-value="applyWorkMinutes(Number($event))" />
+              </UFormField>
+              <UFormField :label="$t('tools.pomodoro.breakMinutes')">
+                <UInput :model-value="breakMinutes" type="number" :min="1" :max="60" class="w-full" @update:model-value="applyBreakMinutes(Number($event))" />
+              </UFormField>
+            </div>
+            <UAlert color="primary" variant="soft" icon="i-lucide-info" description="后台运行时会按真实时间切换阶段，阶段结束会弹出提示并播放提醒音。" />
+          </div>
+        </ToolSection>
 
-    <ToolSection :title="$t('tools.pomodoro.session')" compact>
-      <div class="rounded-2xl border border-default/70 bg-elevated/70 p-6 text-center">
-        <UBadge :color="phase === 'work' ? 'primary' : 'success'" variant="soft" size="lg">
+        <ResultPanel :title="$t('tools.pomodoro.cyclesTitle')" :value="String(cycleCount)" compact />
+      </div>
+
+      <div class="tool-preview-sticky">
+        <ToolSection :title="$t('tools.pomodoro.session')" compact>
+          <div class="tool-stage p-6 text-center shadow-inner shadow-default/5">
+            <div class="flex flex-wrap items-center justify-center gap-2">
+              <UBadge :color="phase === 'work' ? 'primary' : 'success'" variant="soft" size="lg" class="rounded-full">
+                {{ phase === 'work' ? $t('tools.pomodoro.workPhase') : $t('tools.pomodoro.breakPhase') }}
+              </UBadge>
+              <UBadge :color="running ? 'primary' : 'neutral'" variant="soft" class="rounded-full">
+                {{ running ? '进行中' : '已暂停' }}
+              </UBadge>
+            </div>
+            <div class="mt-4 text-6xl font-black tracking-widest text-highlighted sm:text-7xl">{{ displayTime }}</div>
+            <UProgress class="mt-5" :model-value="progress" :max="100" />
+            <div class="mt-5 flex flex-wrap justify-center gap-2">
+              <UButton color="primary" class="rounded-full" @click="toggle">
+                {{ running ? $t('tools.pomodoro.pause') : $t('tools.pomodoro.start') }}
+              </UButton>
+              <UButton color="neutral" variant="soft" class="rounded-full" @click="skipPhase">
+                {{ $t('tools.pomodoro.skip') }}
+              </UButton>
+              <UButton color="neutral" variant="ghost" class="rounded-full" @click="resetAll">
+                {{ $t('tools.pomodoro.reset') }}
+              </UButton>
+              <UButton color="neutral" variant="ghost" icon="i-lucide-maximize-2" class="rounded-full" @click="fullscreen = true">
+                全屏
+              </UButton>
+            </div>
+          </div>
+        </ToolSection>
+      </div>
+    </div>
+
+    <div v-if="fullscreen" class="tool-fullscreen-stage fixed inset-0 z-50 flex flex-col items-center justify-center p-6">
+      <UButton color="neutral" variant="ghost" icon="i-lucide-minimize-2" class="absolute right-6 top-6 rounded-full" @click="fullscreen = false">退出全屏</UButton>
+      <div class="flex flex-wrap items-center justify-center gap-2">
+        <UBadge :color="phase === 'work' ? 'primary' : 'success'" variant="soft" size="lg" class="rounded-full">
           {{ phase === 'work' ? $t('tools.pomodoro.workPhase') : $t('tools.pomodoro.breakPhase') }}
         </UBadge>
-        <div class="mt-4 text-5xl font-semibold tracking-widest text-highlighted">{{ displayTime }}</div>
-        <UProgress class="mt-4" :model-value="progress" :max="100" />
-        <div class="mt-4 flex flex-wrap justify-center gap-2">
-          <UButton color="primary" class="rounded-full" @click="toggle">
-            {{ running ? $t('tools.pomodoro.pause') : $t('tools.pomodoro.start') }}
-          </UButton>
-          <UButton color="neutral" variant="ghost" class="rounded-full" @click="skipPhase">
-            {{ $t('tools.pomodoro.skip') }}
-          </UButton>
-          <UButton color="neutral" variant="ghost" class="rounded-full" @click="resetAll">
-            {{ $t('tools.pomodoro.reset') }}
-          </UButton>
-          <UButton color="neutral" variant="ghost" icon="i-lucide-maximize-2" class="rounded-full" @click="fullscreen = true">
-            全屏
-          </UButton>
-        </div>
+        <UBadge :color="running ? 'primary' : 'neutral'" variant="soft" size="lg" class="rounded-full">
+          {{ running ? '进行中' : '已暂停' }}
+        </UBadge>
       </div>
-    </ToolSection>
-
-    <ResultPanel :title="$t('tools.pomodoro.cyclesTitle')" :value="String(cycleCount)" compact />
-
-    <div v-if="fullscreen" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-default p-6">
-      <UButton color="neutral" variant="ghost" icon="i-lucide-minimize-2" class="absolute right-6 top-6 rounded-full" @click="fullscreen = false">退出全屏</UButton>
-      <UBadge :color="phase === 'work' ? 'primary' : 'success'" variant="soft" size="lg">
-        {{ phase === 'work' ? $t('tools.pomodoro.workPhase') : $t('tools.pomodoro.breakPhase') }}
-      </UBadge>
       <div class="mt-8 text-[18vw] font-black leading-none tracking-widest text-highlighted">{{ displayTime }}</div>
       <UProgress class="mt-8 w-full max-w-4xl" :model-value="progress" :max="100" />
       <div class="mt-8 flex flex-wrap justify-center gap-3">

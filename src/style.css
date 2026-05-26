@@ -48,19 +48,238 @@
 @layer utilities {
   .app-surface {
     background:
-      radial-gradient(circle at 10% -10%, color-mix(in oklab, CanvasText 7%, transparent), transparent 30rem),
-      radial-gradient(circle at 95% 5%, color-mix(in oklab, CanvasText 6%, transparent), transparent 32rem),
-      linear-gradient(180deg, color-mix(in oklab, var(--ui-bg) 96%, CanvasText 4%), var(--ui-bg) 40rem);
+      radial-gradient(circle at 8% -8%, color-mix(in oklab, var(--ui-primary) 13%, transparent), transparent 30rem),
+      radial-gradient(circle at 88% 4%, color-mix(in oklab, var(--ui-secondary) 11%, transparent), transparent 34rem),
+      radial-gradient(circle at 56% 110%, color-mix(in oklab, CanvasText 6%, transparent), transparent 28rem),
+      linear-gradient(180deg, color-mix(in oklab, var(--ui-bg) 94%, CanvasText 5%), var(--ui-bg) 42rem);
   }
 
   .glass-panel {
-    background: color-mix(in oklab, var(--ui-bg-elevated) 86%, transparent);
-    border-color: color-mix(in oklab, var(--ui-border) 80%, transparent);
-    backdrop-filter: blur(14px);
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--ui-bg-elevated) 88%, transparent), color-mix(in oklab, var(--ui-bg) 76%, transparent)),
+      radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--ui-primary) 8%, transparent), transparent 16rem);
+    border-color: color-mix(in oklab, var(--ui-border) 76%, transparent);
+    box-shadow: 12px 0 44px color-mix(in oklab, CanvasText 5%, transparent);
+    backdrop-filter: blur(22px) saturate(1.15);
+  }
+
+  .hig-surface,
+  .hig-panel {
+    position: relative;
+    isolation: isolate;
+    border-color: color-mix(in oklab, var(--ui-border) 70%, transparent);
+    backdrop-filter: blur(22px) saturate(1.12);
+  }
+
+  .hig-surface {
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--ui-bg-elevated) 90%, transparent), color-mix(in oklab, var(--ui-bg-elevated) 70%, transparent)),
+      radial-gradient(circle at 14% -6%, color-mix(in oklab, white 20%, transparent), transparent 16rem);
+    box-shadow:
+      0 1px 0 color-mix(in oklab, white 34%, transparent) inset,
+      0 22px 60px color-mix(in oklab, CanvasText 9%, transparent);
+  }
+
+  .hig-modal-surface {
+    isolation: isolate;
+    border-color: color-mix(in oklab, var(--ui-border) 70%, transparent);
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--ui-bg-elevated) 90%, transparent), color-mix(in oklab, var(--ui-bg-elevated) 70%, transparent)),
+      radial-gradient(circle at 14% -6%, color-mix(in oklab, white 20%, transparent), transparent 16rem);
+    box-shadow:
+      0 1px 0 color-mix(in oklab, white 34%, transparent) inset,
+      0 22px 60px color-mix(in oklab, CanvasText 9%, transparent);
+    backdrop-filter: blur(22px) saturate(1.12);
+  }
+
+  .hig-panel {
+    overflow: hidden;
+    background:
+      linear-gradient(145deg, color-mix(in oklab, var(--ui-bg-elevated) 94%, transparent), color-mix(in oklab, var(--ui-bg-elevated) 70%, transparent)),
+      radial-gradient(circle at 8% -10%, color-mix(in oklab, var(--ui-primary) 12%, transparent), transparent 18rem),
+      radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--ui-secondary) 8%, transparent), transparent 18rem);
+    box-shadow:
+      0 1px 0 color-mix(in oklab, white 30%, transparent) inset,
+      0 16px 46px color-mix(in oklab, CanvasText 7%, transparent);
+  }
+
+  .hig-panel::after,
+  .hig-surface::after {
+    pointer-events: none;
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: linear-gradient(135deg, color-mix(in oklab, white 18%, transparent), transparent 36%, color-mix(in oklab, var(--ui-primary) 6%, transparent));
+    opacity: 0.42;
+  }
+
+  .dark .hig-surface,
+  .dark .hig-panel {
+    box-shadow:
+      0 1px 0 color-mix(in oklab, white 8%, transparent) inset,
+      0 22px 70px color-mix(in oklab, black 34%, transparent);
+  }
+
+  .hig-workbench {
+    position: relative;
+  }
+
+  .hig-workbench::before {
+    pointer-events: none;
+    content: '';
+    position: absolute;
+    inset: -5rem -1.5rem auto;
+    height: 26rem;
+    background:
+      radial-gradient(circle at 12% 10%, color-mix(in oklab, var(--ui-primary) 12%, transparent), transparent 18rem),
+      radial-gradient(circle at 88% 0%, color-mix(in oklab, var(--ui-secondary) 11%, transparent), transparent 22rem),
+      linear-gradient(90deg, transparent, color-mix(in oklab, CanvasText 4%, transparent), transparent);
+    filter: blur(2px);
+    opacity: 0.9;
+  }
+
+  .tool-page-stack {
+    position: relative;
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .tool-workspace {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .tool-command-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 1.25rem;
+    border: 1px solid color-mix(in oklab, var(--ui-border) 68%, transparent);
+    background: color-mix(in oklab, var(--ui-bg-elevated) 58%, transparent);
+    padding: 0.5rem;
+    box-shadow: 0 1px 0 color-mix(in oklab, white 24%, transparent) inset;
+  }
+
+  .tool-control-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 0.875rem;
+  }
+
+  .tool-metric-card {
+    border-radius: 1.35rem;
+    border: 1px solid color-mix(in oklab, var(--ui-border) 68%, transparent);
+    background: color-mix(in oklab, var(--ui-bg-elevated) 58%, transparent);
+    padding: 0.875rem;
+    box-shadow: 0 1px 0 color-mix(in oklab, white 22%, transparent) inset;
+  }
+
+  .tool-list-item {
+    border-radius: 1rem;
+    border: 1px solid color-mix(in oklab, var(--ui-border) 68%, transparent);
+    background: color-mix(in oklab, var(--ui-bg-elevated) 58%, transparent);
+    padding: 0.75rem;
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .tool-list-item:hover {
+    border-color: color-mix(in oklab, var(--ui-primary) 34%, var(--ui-border));
+    background: color-mix(in oklab, var(--ui-primary) 6%, var(--ui-bg-elevated));
+    transform: translateY(-1px);
+  }
+
+  .tool-stage {
+    border-radius: 1.75rem;
+    border: 1px solid color-mix(in oklab, var(--ui-border) 70%, transparent);
+    background:
+      radial-gradient(circle at 15% 0%, color-mix(in oklab, var(--ui-primary) 8%, transparent), transparent 16rem),
+      color-mix(in oklab, var(--ui-bg-elevated) 66%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in oklab, white 20%, transparent);
+  }
+
+  .tool-fullscreen-stage {
+    background:
+      radial-gradient(circle at 18% 12%, color-mix(in oklab, var(--ui-primary) 13%, transparent), transparent 28rem),
+      radial-gradient(circle at 82% 10%, color-mix(in oklab, var(--ui-secondary) 11%, transparent), transparent 26rem),
+      var(--ui-bg);
+  }
+
+  .tool-preview-sticky {
+    min-width: 0;
+  }
+
+  @media (min-width: 1024px) {
+    .tool-workspace {
+      grid-template-columns: minmax(0, 1fr) minmax(22rem, 0.86fr);
+      align-items: start;
+    }
+
+    .tool-preview-sticky {
+      position: sticky;
+      top: 5.75rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .tool-workspace {
+      grid-template-columns: minmax(0, 1.06fr) minmax(24rem, 0.82fr);
+    }
+  }
+
+  .hig-action-cluster {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklab, var(--ui-border) 62%, transparent);
+    background: color-mix(in oklab, var(--ui-bg-elevated) 64%, transparent);
+    padding: 0.4rem;
+    box-shadow: 0 1px 0 color-mix(in oklab, white 24%, transparent) inset;
+  }
+
+  .hig-subtle-surface {
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--ui-bg-elevated) 76%, transparent), color-mix(in oklab, var(--ui-bg-elevated) 58%, transparent));
+    border-color: color-mix(in oklab, var(--ui-border) 68%, transparent);
+  }
+
+  .hig-divider {
+    border-color: color-mix(in oklab, var(--ui-border) 68%, transparent);
+  }
+
+  .hig-hover-lift {
+    transition:
+      transform 180ms ease,
+      box-shadow 180ms ease,
+      border-color 180ms ease,
+      background-color 180ms ease;
+  }
+
+  .hig-hover-lift:hover {
+    transform: translateY(-2px);
   }
 
   .hig-focus {
     outline: none;
-    box-shadow: 0 0 0 2px color-mix(in oklab, Highlight 45%, transparent);
+    box-shadow:
+      0 0 0 2px color-mix(in oklab, var(--ui-bg) 88%, transparent),
+      0 0 0 4px color-mix(in oklab, Highlight 54%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hig-hover-lift,
+    .hig-hover-lift:hover {
+      transform: none;
+      transition: none;
+    }
   }
 }

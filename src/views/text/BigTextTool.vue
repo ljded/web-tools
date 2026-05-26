@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import CopyBtn from '@/components/CopyBtn.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
@@ -62,42 +61,51 @@ function resetChunkIndex() {
 </script>
 
 <template>
-  <ToolPage name="bigtext" max-width="5xl" icon="i-lucide-database">
-    <ToolSection :title="$t('tools.bigtext.inputTitle')" :description="$t('tools.bigtext.inputDesc')">
-      <UTabs
-        v-model="mode"
-        :items="[
-          { label: $t('tools.bigtext.modes.stats'), value: 'stats' },
-          { label: $t('tools.bigtext.modes.dedupe'), value: 'dedupe' },
-          { label: $t('tools.bigtext.modes.sort'), value: 'sort' },
-          { label: $t('tools.bigtext.modes.chunk'), value: 'chunk' },
-        ]"
-        @update:model-value="resetChunkIndex"
-      />
-
-      <UTextarea v-model="input" :rows="12" class="mt-4 w-full" :placeholder="$t('tools.bigtext.placeholder')" />
-
-      <div v-if="mode === 'chunk'" class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <UFormField :label="$t('tools.bigtext.chunkSize')">
-          <UInput v-model.number="chunkSize" type="number" :min="1" :max="500000" />
-        </UFormField>
-        <UFormField :label="$t('tools.bigtext.chunkIndex')">
-          <UInput
-            :model-value="chunkIndex + 1"
-            type="number"
-            :min="1"
-            :max="Math.max(chunks.length, 1)"
-            @update:model-value="chunkIndex = Math.max(0, Math.min(Number($event || 1) - 1, Math.max(chunks.length - 1, 0)))"
+  <ToolPage name="bigtext" max-width="6xl" icon="i-lucide-database">
+    <div class="tool-workspace">
+      <ToolSection :title="$t('tools.bigtext.inputTitle')" :description="$t('tools.bigtext.inputDesc')">
+        <div class="space-y-5">
+          <UTabs
+            v-model="mode"
+            :items="[
+              { label: $t('tools.bigtext.modes.stats'), value: 'stats' },
+              { label: $t('tools.bigtext.modes.dedupe'), value: 'dedupe' },
+              { label: $t('tools.bigtext.modes.sort'), value: 'sort' },
+              { label: $t('tools.bigtext.modes.chunk'), value: 'chunk' },
+            ]"
+            @update:model-value="resetChunkIndex"
           />
-        </UFormField>
-        <div class="flex items-end text-sm text-muted">{{ $t('tools.bigtext.chunkMeta', { meta: chunkMeta }) }}</div>
-      </div>
-    </ToolSection>
 
-    <ResultPanel :title="$t('tools.bigtext.resultTitle')" :value="output" pre-wrap>
-      <template #actions>
-        <CopyBtn :text="output" variant="button" :disabled="!output" />
-      </template>
-    </ResultPanel>
+          <UTextarea v-model="input" :rows="14" class="w-full" :placeholder="$t('tools.bigtext.placeholder')" />
+
+          <div v-if="mode === 'chunk'" class="tool-control-grid">
+            <UFormField :label="$t('tools.bigtext.chunkSize')">
+              <UInput v-model.number="chunkSize" type="number" :min="1" :max="500000" class="w-full" />
+            </UFormField>
+            <UFormField :label="$t('tools.bigtext.chunkIndex')">
+              <UInput
+                :model-value="chunkIndex + 1"
+                type="number"
+                :min="1"
+                :max="Math.max(chunks.length, 1)"
+                class="w-full"
+                @update:model-value="chunkIndex = Math.max(0, Math.min(Number($event || 1) - 1, Math.max(chunks.length - 1, 0)))"
+              />
+            </UFormField>
+            <div class="tool-metric-card flex items-center text-sm text-muted">{{ $t('tools.bigtext.chunkMeta', { meta: chunkMeta }) }}</div>
+          </div>
+        </div>
+      </ToolSection>
+
+      <div class="tool-preview-sticky space-y-4">
+        <ToolSection :title="$t('tools.bigtext.overviewTitle')" compact>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="tool-metric-card"><div class="text-2xl font-black text-highlighted">{{ lines.length }}</div><div class="text-xs text-muted">{{ $t('tools.bigtext.lines') }}</div></div>
+            <div class="tool-metric-card"><div class="text-2xl font-black text-highlighted">{{ input.length }}</div><div class="text-xs text-muted">{{ $t('tools.bigtext.chars') }}</div></div>
+          </div>
+        </ToolSection>
+        <ResultPanel :title="$t('tools.bigtext.resultTitle')" :value="output" pre-wrap max-height="520px" />
+      </div>
+    </div>
   </ToolPage>
 </template>

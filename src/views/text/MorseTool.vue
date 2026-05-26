@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import CopyBtn from '@/components/CopyBtn.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
@@ -46,22 +45,25 @@ const output = computed(() => {
 </script>
 
 <template>
-  <ToolPage name="morse" max-width="4xl" icon="i-lucide-radio-tower">
-    <ToolSection :title="$t('tools.morse.inputTitle')" :description="$t('tools.morse.inputDesc')">
-      <UTabs
-        v-model="mode"
-        :items="[
-          { label: $t('tools.morse.encode'), value: 'encode' },
-          { label: $t('tools.morse.decode'), value: 'decode' },
-        ]"
-      />
-      <UTextarea v-model="input" :rows="8" class="mt-4 w-full" :placeholder="mode === 'encode' ? $t('tools.morse.encodePlaceholder') : $t('tools.morse.decodePlaceholder')" />
-    </ToolSection>
+  <ToolPage name="morse" max-width="6xl" icon="i-lucide-radio-tower">
+    <div class="tool-workspace">
+      <ToolSection :title="$t('tools.morse.inputTitle')" :description="$t('tools.morse.inputDesc')">
+        <div class="space-y-4">
+          <UTabs
+            v-model="mode"
+            :items="[
+              { label: $t('tools.morse.encode'), value: 'encode' },
+              { label: $t('tools.morse.decode'), value: 'decode' },
+            ]"
+          />
+          <UTextarea v-model="input" :rows="8" class="w-full" :placeholder="mode === 'encode' ? $t('tools.morse.encodePlaceholder') : $t('tools.morse.decodePlaceholder')" />
+          <ResultPanel class="lg:hidden" :title="$t('tools.morse.resultTitle')" :value="output" pre-wrap compact />
+        </div>
+      </ToolSection>
 
-    <ResultPanel :title="$t('tools.morse.resultTitle')" :value="output" pre-wrap>
-      <template #actions>
-        <CopyBtn :text="output" variant="button" :disabled="!output" />
-      </template>
-    </ResultPanel>
+      <div class="hidden lg:block tool-preview-sticky">
+        <ResultPanel :title="$t('tools.morse.resultTitle')" :value="output" pre-wrap max-height="360px" />
+      </div>
+    </div>
   </ToolPage>
 </template>

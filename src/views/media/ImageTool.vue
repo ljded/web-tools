@@ -67,6 +67,8 @@ const labResultUrl = ref('')
 const labResultName = ref('image-output.png')
 const labError = ref('')
 const gifInfo = ref('')
+const phantomWhiteIndex = ref(0)
+const phantomBlackIndex = ref(1)
 
 const batchOps = [
   { value: 'compress' as const, label: '压缩', icon: 'i-lucide-minimize-2' },
@@ -96,6 +98,33 @@ const metadataText = computed(() => {
   ].join('\n')).join('\n\n')
 })
 
+const phantomImageOptions = computed(() => labImages.value.map((item, index) => ({
+  label: `#${index + 1} ${item.file.name}`,
+  value: index,
+})))
+
+function syncPhantomIndexes() {
+  if (!labImages.value.length) {
+    phantomWhiteIndex.value = 0
+    phantomBlackIndex.value = 1
+    return
+  }
+
+  const lastIndex = labImages.value.length - 1
+  phantomWhiteIndex.value = Math.min(Math.max(phantomWhiteIndex.value, 0), lastIndex)
+  phantomBlackIndex.value = Math.min(Math.max(phantomBlackIndex.value, 0), lastIndex)
+  if (labImages.value.length > 1 && phantomWhiteIndex.value === phantomBlackIndex.value) {
+    phantomBlackIndex.value = phantomWhiteIndex.value === 0 ? 1 : 0
+  }
+}
+
+function swapPhantomRoles() {
+  const white = phantomWhiteIndex.value
+  phantomWhiteIndex.value = phantomBlackIndex.value
+  phantomBlackIndex.value = white
+  clearLabResult()
+}
+
 function formatBytes(size: number) {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
@@ -122,6 +151,7 @@ async function addLabFiles(fileList: File[]) {
   const valid = fileList.filter((f) => f.type.startsWith('image/'))
   const loaded = await Promise.all(valid.map(loadImageSource))
   labImages.value.push(...loaded)
+  syncPhantomIndexes()
   clearLabResult()
   if (labOp.value === 'gif') inspectGif()
 }
@@ -136,6 +166,7 @@ function removeLabImage(idx: number) {
   const item = labImages.value[idx]
   if (item) URL.revokeObjectURL(item.url)
   labImages.value.splice(idx, 1)
+  syncPhantomIndexes()
   clearLabResult()
 }
 
@@ -227,13 +258,15 @@ function processCanvasItem(item: FileItem, img: HTMLImageElement) {
   let h = img.height
 
   if (batchOp.value === 'resize') {
+    const targetWidth = Math.max(1, Math.round(Number(resizeWidth.value) || w))
+    const targetHeight = Math.max(1, Math.round(Number(resizeHeight.value) || h))
     if (keepRatio.value) {
-      const ratio = Math.min(resizeWidth.value / w, resizeHeight.value / h)
-      w = Math.round(w * ratio)
-      h = Math.round(h * ratio)
+      const ratio = Math.max(1 / Math.max(w, h), Math.min(targetWidth / w, targetHeight / h))
+      w = Math.max(1, Math.round(w * ratio))
+      h = Math.max(1, Math.round(h * ratio))
     } else {
-      w = resizeWidth.value
-      h = resizeHeight.value
+      w = targetWidth
+      h = targetHeight
     }
     canvas.width = w
     canvas.height = h
@@ -310,10 +343,17 @@ function downloadUrl(url: string, name: string) {
 }
 
 async function generatePhantomTank() {
-  if (labImages.value.length < 2) { labError.value = '需要上传 2 张图片：白底可见图与黑底可见图'; return }
+  syncPhantomIndexes()
+  const whiteSource = labImages.value[phantomWhiteIndex.value]
+  const blackSource = labImages.value[phantomBlackIndex.value]
+  if (!whiteSource || !blackSource || phantomWhiteIndex.value === phantomBlackIndex.value) {
+    labError.value = '需要选择两张不同图片：白底可见图与黑底可见图'
+    return
+  }
+
   try {
-    const whiteImg = await loadImage(labImages.value[0]!.url)
-    const blackImg = await loadImage(labImages.value[1]!.url)
+    const whiteImg = await loadImage(whiteSource.url)
+    const blackImg = await loadImage(blackSource.url)
     const width = Math.min(whiteImg.width, blackImg.width, 1600)
     const height = Math.min(whiteImg.height, blackImg.height, 1600)
     const canvas = document.createElement('canvas')
@@ -322,8 +362,8 @@ async function generatePhantomTank() {
     canvas.width = a.width = b.width = width
     canvas.height = a.height = b.height = height
     const ctx = canvas.getContext('2d')!
-    const actx = a.getContext('2d')!
-    const bctx = b.getContext('2d')!
+    const actx = a.getContext('2d', { willReadFrequently: true })!
+    const bctx = b.getContext('2d', { willReadFrequently: true })!
     actx.drawImage(whiteImg, 0, 0, width, height)
     bctx.drawImage(blackImg, 0, 0, width, height)
     const whiteData = actx.getImageData(0, 0, width, height)
@@ -332,9 +372,9 @@ async function generatePhantomTank() {
     for (let i = 0; i < out.data.length; i += 4) {
       const whiteLum = (whiteData.data[i]! * 0.299 + whiteData.data[i + 1]! * 0.587 + whiteData.data[i + 2]! * 0.114) / 255
       const blackLum = (blackData.data[i]! * 0.299 + blackData.data[i + 1]! * 0.587 + blackData.data[i + 2]! * 0.114) / 255
-      const alpha = Math.min(1, Math.max(0.08, 1 - whiteLum + blackLum))
-      const color = Math.round((blackLum / alpha) * 255)
-      out.data[i] = out.data[i + 1] = out.data[i + 2] = Math.min(255, Math.max(0, color))
+      const alpha = Math.min(1, Math.max(0, 1 - whiteLum + blackLum))
+      const gray = alpha <= 0.001 ? 0 : Math.round(Math.min(1, Math.max(0, blackLum / alpha)) * 255)
+      out.data[i] = out.data[i + 1] = out.data[i + 2] = gray
       out.data[i + 3] = Math.round(alpha * 255)
     }
     ctx.putImageData(out, 0, 0)
@@ -578,24 +618,72 @@ watch(labOp, () => {
     <div v-if="activeMode === 'batch'" class="space-y-5">
       <ToolSection title="处理参数" compact>
         <UTabs v-model="batchOp" :items="batchOps.map((op) => ({ label: op.label, value: op.value, icon: op.icon }))" />
-        <div class="mt-4 flex flex-wrap items-end gap-4">
+        <div class="hig-subtle-surface mt-4 grid gap-4 rounded-[1.75rem] border p-4 sm:grid-cols-2 lg:grid-cols-4">
           <template v-if="batchOp === 'compress'">
-            <UFormField label="质量"><USlider v-model="quality" :min="0.1" :max="1" :step="0.1" class="w-32" /><span class="text-xs text-muted">{{ Math.round(quality * 100) }}%</span></UFormField>
-            <UFormField label="最大宽高"><UInput v-model.number="maxWidth" class="w-24" /></UFormField>
+            <UFormField :label="`质量 ${Math.round(quality * 100)}%`">
+              <USlider v-model="quality" :min="0.1" :max="1" :step="0.1" />
+            </UFormField>
+            <UFormField label="最大宽高">
+              <UInput v-model.number="maxWidth" class="w-full" />
+            </UFormField>
           </template>
-          <template v-if="batchOp === 'format'"><UFormField label="目标格式"><USelect v-model="targetFormat" :items="[{ label: 'JPEG', value: 'image/jpeg' }, { label: 'PNG', value: 'image/png' }, { label: 'WebP', value: 'image/webp' }]" /></UFormField></template>
-          <template v-if="batchOp === 'resize'"><UFormField label="宽度"><UInput v-model.number="resizeWidth" class="w-24" /></UFormField><UFormField label="高度"><UInput v-model.number="resizeHeight" class="w-24" /></UFormField><UCheckbox v-model="keepRatio" label="保持比例" /></template>
-          <template v-if="batchOp === 'watermark'"><UFormField label="文字"><UInput v-model="wmText" class="w-40" /></UFormField><UFormField :label="`大小: ${wmSize}`"><USlider v-model="wmSize" :min="12" :max="72" :step="1" class="w-28" /></UFormField><UFormField label="颜色"><UColorPicker v-model="wmColor" /></UFormField><UFormField label="位置"><USelect v-model="wmPos" :items="[{ label: '居中', value: 'center' }, { label: '左上', value: 'top-left' }, { label: '右上', value: 'top-right' }, { label: '左下', value: 'bottom-left' }, { label: '右下', value: 'bottom-right' }]" /></UFormField></template>
-          <template v-if="batchOp === 'rotate'"><UFormField label="旋转角度"><USelect v-model="rotateDeg" :items="[{ label: '90°', value: 90 }, { label: '180°', value: 180 }, { label: '270°', value: 270 }]" /></UFormField></template>
-          <template v-if="batchOp === 'crop'"><div class="flex gap-2"><UFormField label="上"><UInput v-model.number="cropTop" class="w-20" /></UFormField><UFormField label="右"><UInput v-model.number="cropRight" class="w-20" /></UFormField><UFormField label="下"><UInput v-model.number="cropBottom" class="w-20" /></UFormField><UFormField label="左"><UInput v-model.number="cropLeft" class="w-20" /></UFormField></div></template>
+          <template v-if="batchOp === 'format'">
+            <UFormField label="目标格式">
+              <USelect v-model="targetFormat" :items="[{ label: 'JPEG', value: 'image/jpeg' }, { label: 'PNG', value: 'image/png' }, { label: 'WebP', value: 'image/webp' }]" class="w-full" />
+            </UFormField>
+          </template>
+          <template v-if="batchOp === 'resize'">
+            <UFormField label="宽度">
+              <UInput v-model.number="resizeWidth" class="w-full" />
+            </UFormField>
+            <UFormField label="高度">
+              <UInput v-model.number="resizeHeight" class="w-full" />
+            </UFormField>
+            <div class="flex items-end pb-1">
+              <UCheckbox v-model="keepRatio" label="保持比例" />
+            </div>
+          </template>
+          <template v-if="batchOp === 'watermark'">
+            <UFormField label="文字">
+              <UInput v-model="wmText" class="w-full" />
+            </UFormField>
+            <UFormField :label="`大小 ${wmSize}`">
+              <USlider v-model="wmSize" :min="12" :max="72" :step="1" />
+            </UFormField>
+            <UFormField label="颜色">
+              <UColorPicker v-model="wmColor" />
+            </UFormField>
+            <UFormField label="位置">
+              <USelect v-model="wmPos" :items="[{ label: '居中', value: 'center' }, { label: '左上', value: 'top-left' }, { label: '右上', value: 'top-right' }, { label: '左下', value: 'bottom-left' }, { label: '右下', value: 'bottom-right' }]" class="w-full" />
+            </UFormField>
+          </template>
+          <template v-if="batchOp === 'rotate'">
+            <UFormField label="旋转角度">
+              <USelect v-model="rotateDeg" :items="[{ label: '90°', value: 90 }, { label: '180°', value: 180 }, { label: '270°', value: 270 }]" class="w-full" />
+            </UFormField>
+          </template>
+          <template v-if="batchOp === 'crop'">
+            <UFormField label="上">
+              <UInput v-model.number="cropTop" class="w-full" />
+            </UFormField>
+            <UFormField label="右">
+              <UInput v-model.number="cropRight" class="w-full" />
+            </UFormField>
+            <UFormField label="下">
+              <UInput v-model.number="cropBottom" class="w-full" />
+            </UFormField>
+            <UFormField label="左">
+              <UInput v-model.number="cropLeft" class="w-full" />
+            </UFormField>
+          </template>
         </div>
       </ToolSection>
 
       <ToolSection title="上传与处理" compact>
         <template #actions><UButton color="primary" icon="i-lucide-play" class="rounded-full" :disabled="!files.length" @click="processAll">全部处理</UButton></template>
-        <FileDropZone accept="image/*" multiple title="拖拽图片或点击上传" icon="i-lucide-image-up" ui-base="h-36 rounded-3xl border-2 border-dashed border-default/70 bg-default/50 transition-colors hover:border-primary/40 hover:bg-primary/5" @files="addFiles" />
+        <FileDropZone accept="image/*" multiple title="拖拽图片或点击上传" icon="i-lucide-image-up" ui-base="h-36 hig-subtle-surface rounded-[1.75rem] border-2 border-dashed transition-colors hover:border-primary/40 hover:bg-primary/5" @files="addFiles" />
         <div v-if="files.length" class="mt-4 space-y-3">
-          <div v-for="(item, i) in files" :key="i" class="flex items-center gap-3 rounded-2xl border border-default/70 bg-default/50 p-3 shadow-sm">
+          <div v-for="(item, i) in files" :key="`${item.file.name}-${item.file.size}-${item.file.lastModified}`" class="flex items-center gap-3 tool-list-item">
             <img :src="item.preview" class="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-sm" />
             <div class="min-w-0 flex-1"><div class="truncate text-sm">{{ item.file.name }}</div><UBadge v-if="item.error" color="error" variant="soft" size="xs">{{ item.error }}</UBadge><UBadge v-else-if="item.loading" color="info" variant="soft" size="xs">压缩中...</UBadge><UBadge v-else-if="item.processing" color="info" variant="soft" size="xs">处理中...</UBadge><div v-else-if="item.resultFile" class="text-xs text-success">已完成 <span v-if="item.ratio" class="ml-1">(-{{ item.ratio }})</span></div></div>
             <UButton v-if="item.resultFile && item.resultUrl" color="primary" variant="ghost" icon="i-lucide-download" class="rounded-full" @click="downloadItem(item)" />
@@ -610,7 +698,7 @@ watch(labOp, () => {
         <UTabs v-model="labOp" :items="labOps.map((op) => ({ label: op.label, value: op.value, icon: op.icon }))" />
         <FileDropZone class="mt-4" accept="image/*" multiple title="上传图片素材" icon="i-lucide-images" @files="addLabFiles" />
         <div v-if="labImages.length" class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <div v-for="(item, i) in labImages" :key="item.url" class="group relative overflow-hidden rounded-2xl border border-default/70 bg-default/50 p-2">
+          <div v-for="(item, i) in labImages" :key="item.url" class="tool-list-item group relative overflow-hidden p-2">
             <img :src="item.url" class="h-28 w-full rounded-xl object-cover" />
             <div class="mt-2 truncate text-xs text-muted">{{ item.file.name }}</div>
             <UButton icon="i-lucide-x" color="neutral" variant="solid" size="xs" class="absolute right-3 top-3 rounded-full opacity-0 group-hover:opacity-100" @click="removeLabImage(i)" />
@@ -619,17 +707,90 @@ watch(labOp, () => {
       </ToolSection>
 
       <ToolSection :title="labOps.find((op) => op.value === labOp)?.label || '处理'" compact>
-        <div v-if="labOp === 'phantom'" class="space-y-3"><p class="text-sm text-muted">上传两张图：第 1 张偏向白底显示，第 2 张偏向黑底显示，生成透明 PNG 幻影坦克图。</p><UButton color="primary" icon="i-lucide-wand-sparkles" :disabled="labImages.length < 2" @click="generatePhantomTank">生成幻影坦克</UButton></div>
-        <div v-if="labOp === 'stitch'" class="flex flex-wrap items-end gap-4"><UFormField label="方向"><USelect v-model="stitchDirection" :items="[{ label: '纵向', value: 'vertical' }, { label: '横向', value: 'horizontal' }, { label: '网格', value: 'grid' }]" /></UFormField><UFormField label="间距"><UInput v-model.number="stitchGap" class="w-24" /></UFormField><UFormField label="背景"><UColorPicker v-model="stitchBg" /></UFormField><UButton color="primary" icon="i-lucide-gallery-horizontal" :disabled="!labImages.length" @click="stitchImages">拼接图片</UButton></div>
-        <div v-if="labOp === 'metadata'" class="space-y-3"><pre class="max-h-80 overflow-auto rounded-2xl bg-elevated p-4 text-xs text-toned">{{ metadataText }}</pre><UButton color="primary" icon="i-lucide-eraser" :disabled="!labImages.length" @click="stripMetadata">重绘并清理元数据</UButton></div>
-        <div v-if="labOp === 'gif'" class="space-y-3"><div class="flex flex-wrap items-end gap-4"><UFormField label="帧间隔(ms)"><UInput v-model.number="gifDelay" class="w-28" /></UFormField><UButton color="primary" icon="i-lucide-film" :disabled="!labImages.length" @click="createGif">图片转 GIF</UButton><UButton color="neutral" variant="soft" icon="i-lucide-split" :disabled="!labImages.length" @click="exportFirstGifFrame">导出 GIF 首帧</UButton></div><pre v-if="gifInfo" class="rounded-2xl bg-elevated p-4 text-xs text-toned">{{ gifInfo }}</pre></div>
-        <div v-if="labOp === 'editor'" class="space-y-4"><div class="grid grid-cols-1 gap-4 md:grid-cols-4"><UFormField :label="`亮度 ${editorBrightness}%`"><USlider v-model="editorBrightness" :min="0" :max="200" /></UFormField><UFormField :label="`对比 ${editorContrast}%`"><USlider v-model="editorContrast" :min="0" :max="200" /></UFormField><UFormField :label="`饱和 ${editorSaturation}%`"><USlider v-model="editorSaturation" :min="0" :max="200" /></UFormField><UFormField :label="`模糊 ${editorBlur}px`"><USlider v-model="editorBlur" :min="0" :max="12" /></UFormField></div><div class="flex flex-wrap items-center gap-4"><UCheckbox v-model="editorFlipX" label="水平翻转" /><UCheckbox v-model="editorFlipY" label="垂直翻转" /><UButton color="primary" icon="i-lucide-sliders-horizontal" :disabled="!labImages.length" @click="applyVisualEditor">应用编辑</UButton></div></div>
+        <div v-if="labOp === 'phantom'" class="space-y-4">
+          <UAlert
+            color="info"
+            variant="soft"
+            icon="i-lucide-info"
+            description="选择白底可见图和黑底可见图后生成透明 PNG。若效果相反，可点击交换两图重新生成。"
+          />
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr] md:items-end">
+            <UFormField label="白底可见图">
+              <USelect v-model="phantomWhiteIndex" :items="phantomImageOptions" :disabled="labImages.length < 2" class="w-full" @update:model-value="clearLabResult" />
+            </UFormField>
+            <UButton color="neutral" variant="soft" icon="i-lucide-arrow-left-right" class="rounded-full" :disabled="labImages.length < 2" @click="swapPhantomRoles">
+              交换
+            </UButton>
+            <UFormField label="黑底可见图">
+              <USelect v-model="phantomBlackIndex" :items="phantomImageOptions" :disabled="labImages.length < 2" class="w-full" @update:model-value="clearLabResult" />
+            </UFormField>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <UButton color="primary" icon="i-lucide-wand-sparkles" class="rounded-full" :disabled="labImages.length < 2 || phantomWhiteIndex === phantomBlackIndex" @click="generatePhantomTank">
+              生成幻影坦克
+            </UButton>
+            <UBadge v-if="labImages.length >= 2 && phantomWhiteIndex === phantomBlackIndex" color="warning" variant="soft" class="rounded-full">
+              请选择两张不同图片
+            </UBadge>
+          </div>
+        </div>
+        <div v-if="labOp === 'stitch'" class="hig-subtle-surface grid gap-4 rounded-[1.75rem] border p-4 sm:grid-cols-3">
+          <UFormField label="方向">
+            <USelect v-model="stitchDirection" :items="[{ label: '纵向', value: 'vertical' }, { label: '横向', value: 'horizontal' }, { label: '网格', value: 'grid' }]" class="w-full" />
+          </UFormField>
+          <UFormField label="间距">
+            <UInput v-model.number="stitchGap" class="w-full" />
+          </UFormField>
+          <UFormField label="背景">
+            <UColorPicker v-model="stitchBg" />
+          </UFormField>
+          <div class="sm:col-span-3">
+            <UButton color="primary" icon="i-lucide-gallery-horizontal" class="rounded-full" :disabled="!labImages.length" @click="stitchImages">拼接图片</UButton>
+          </div>
+        </div>
+        <div v-if="labOp === 'metadata'" class="space-y-3">
+          <pre class="hig-subtle-surface max-h-80 overflow-auto rounded-[1.35rem] border p-4 text-xs text-toned">{{ metadataText }}</pre>
+          <UButton color="primary" icon="i-lucide-eraser" class="rounded-full" :disabled="!labImages.length" @click="stripMetadata">重绘并清理元数据</UButton>
+        </div>
+        <div v-if="labOp === 'gif'" class="space-y-3">
+          <div class="hig-subtle-surface grid gap-4 rounded-[1.75rem] border p-4 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+            <UFormField label="帧间隔(ms)">
+              <UInput v-model.number="gifDelay" class="w-full" />
+            </UFormField>
+            <UButton color="primary" icon="i-lucide-film" class="rounded-full" :disabled="!labImages.length" @click="createGif">图片转 GIF</UButton>
+            <UButton color="neutral" variant="soft" icon="i-lucide-split" class="rounded-full" :disabled="!labImages.length" @click="exportFirstGifFrame">导出 GIF 首帧</UButton>
+          </div>
+          <pre v-if="gifInfo" class="hig-subtle-surface rounded-[1.35rem] border p-4 text-xs text-toned">{{ gifInfo }}</pre>
+        </div>
+        <div v-if="labOp === 'editor'" class="space-y-4">
+          <div class="hig-subtle-surface grid grid-cols-1 gap-4 rounded-[1.75rem] border p-4 md:grid-cols-4">
+            <UFormField :label="`亮度 ${editorBrightness}%`"><USlider v-model="editorBrightness" :min="0" :max="200" /></UFormField>
+            <UFormField :label="`对比 ${editorContrast}%`"><USlider v-model="editorContrast" :min="0" :max="200" /></UFormField>
+            <UFormField :label="`饱和 ${editorSaturation}%`"><USlider v-model="editorSaturation" :min="0" :max="200" /></UFormField>
+            <UFormField :label="`模糊 ${editorBlur}px`"><USlider v-model="editorBlur" :min="0" :max="12" /></UFormField>
+          </div>
+          <div class="flex flex-wrap items-center gap-4">
+            <UCheckbox v-model="editorFlipX" label="水平翻转" />
+            <UCheckbox v-model="editorFlipY" label="垂直翻转" />
+            <UButton color="primary" icon="i-lucide-sliders-horizontal" class="rounded-full" :disabled="!labImages.length" @click="applyVisualEditor">应用编辑</UButton>
+          </div>
+        </div>
         <UAlert v-if="labError" class="mt-4" color="error" variant="soft" icon="i-lucide-circle-alert" :description="labError" />
       </ToolSection>
 
       <ToolSection v-if="labResultUrl" title="输出预览" compact>
         <template #actions><UButton icon="i-lucide-download" color="primary" class="rounded-full" @click="downloadLabResult">下载结果</UButton></template>
-        <div class="rounded-3xl border border-default/70 bg-elevated p-4"><img :src="labResultUrl" class="mx-auto max-h-[520px] max-w-full rounded-2xl object-contain" /></div>
+        <div v-if="labOp === 'phantom'" class="grid gap-4 md:grid-cols-2">
+          <div class="rounded-[1.75rem] border border-white/70 p-4 shadow-inner shadow-black/5" style="background-color: #fff;">
+            <div class="mb-3 text-xs font-semibold uppercase tracking-wider" style="color: #64748b;">浅色背景</div>
+            <img :src="labResultUrl" class="mx-auto max-h-[420px] max-w-full rounded-2xl object-contain" />
+          </div>
+          <div class="rounded-[1.75rem] border border-white/10 p-4 shadow-inner shadow-black/40" style="background-color: #020617;">
+            <div class="mb-3 text-xs font-semibold uppercase tracking-wider" style="color: #cbd5e1;">深色背景</div>
+            <img :src="labResultUrl" class="mx-auto max-h-[420px] max-w-full rounded-2xl object-contain" />
+          </div>
+        </div>
+        <div v-else class="hig-subtle-surface rounded-[1.75rem] border p-4"><img :src="labResultUrl" class="mx-auto max-h-[520px] max-w-full rounded-2xl object-contain" /></div>
       </ToolSection>
     </div>
   </ToolPage>
