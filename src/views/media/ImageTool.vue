@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { usePersistedRef } from '@/utils/persist'
+import { useRouteQueryValue } from '@/utils/routeQuery'
 import { compressImageFile } from '@/utils/imageCompression'
 import FileDropZone from '@/components/FileDropZone.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
@@ -28,11 +30,16 @@ interface ImageSource {
 type BatchOp = 'compress' | 'format' | 'resize' | 'watermark' | 'rotate' | 'crop'
 type LabOp = 'phantom' | 'stitch' | 'metadata' | 'gif' | 'editor'
 
+const { t } = useI18n()
+
 const files = ref<FileItem[]>([])
 const labImages = ref<ImageSource[]>([])
 const activeMode = usePersistedRef<'batch' | 'lab'>('web-tools:image:active-mode', 'batch')
 const batchOp = usePersistedRef<BatchOp>('web-tools:image:batch-op', 'compress')
 const labOp = usePersistedRef<LabOp>('web-tools:image:lab-op', 'phantom')
+useRouteQueryValue('mode', activeMode, ['batch', 'lab'])
+useRouteQueryValue('batch', batchOp, ['compress', 'format', 'resize', 'watermark', 'rotate', 'crop'])
+useRouteQueryValue('lab', labOp, ['phantom', 'stitch', 'metadata', 'gif', 'editor'])
 
 const quality = usePersistedRef('web-tools:image:quality', 0.8)
 const maxWidth = usePersistedRef('web-tools:image:max-width', 1920)
@@ -71,30 +78,35 @@ const phantomWhiteIndex = ref(0)
 const phantomBlackIndex = ref(1)
 
 const batchOps = [
-  { value: 'compress' as const, label: '压缩', icon: 'i-lucide-minimize-2' },
-  { value: 'format' as const, label: '转格式', icon: 'i-lucide-image' },
-  { value: 'resize' as const, label: '缩放', icon: 'i-lucide-maximize' },
-  { value: 'watermark' as const, label: '水印', icon: 'i-lucide-type' },
-  { value: 'rotate' as const, label: '旋转', icon: 'i-lucide-rotate-cw' },
-  { value: 'crop' as const, label: '裁剪', icon: 'i-lucide-scissors' },
+  { value: 'compress' as const, labelKey: 'tools.image.batchOps.compress', icon: 'i-lucide-minimize-2' },
+  { value: 'format' as const, labelKey: 'tools.image.batchOps.format', icon: 'i-lucide-image' },
+  { value: 'resize' as const, labelKey: 'tools.image.batchOps.resize', icon: 'i-lucide-maximize' },
+  { value: 'watermark' as const, labelKey: 'tools.image.batchOps.watermark', icon: 'i-lucide-type' },
+  { value: 'rotate' as const, labelKey: 'tools.image.batchOps.rotate', icon: 'i-lucide-rotate-cw' },
+  { value: 'crop' as const, labelKey: 'tools.image.batchOps.crop', icon: 'i-lucide-scissors' },
 ]
 
 const labOps = [
-  { value: 'phantom' as const, label: '幻影坦克', icon: 'i-lucide-layers' },
-  { value: 'stitch' as const, label: '图片拼接', icon: 'i-lucide-gallery-horizontal' },
-  { value: 'metadata' as const, label: '图片信息', icon: 'i-lucide-info' },
-  { value: 'gif' as const, label: 'GIF', icon: 'i-lucide-film' },
-  { value: 'editor' as const, label: '可视编辑', icon: 'i-lucide-sliders-horizontal' },
+  { value: 'phantom' as const, labelKey: 'tools.image.labOps.phantom', icon: 'i-lucide-layers' },
+  { value: 'stitch' as const, labelKey: 'tools.image.labOps.stitch', icon: 'i-lucide-gallery-horizontal' },
+  { value: 'metadata' as const, labelKey: 'tools.image.labOps.metadata', icon: 'i-lucide-info' },
+  { value: 'gif' as const, labelKey: 'tools.image.labOps.gif', icon: 'i-lucide-film' },
+  { value: 'editor' as const, labelKey: 'tools.image.labOps.editor', icon: 'i-lucide-sliders-horizontal' },
 ]
 
+const activeLabTitle = computed(() => {
+  const op = labOps.find((item) => item.value === labOp.value)
+  return op ? t(op.labelKey) : t('tools.image.process')
+})
+
 const metadataText = computed(() => {
-  if (!labImages.value.length) return '请先上传图片'
+  if (!labImages.value.length) return t('tools.image.uploadImagesFirst')
   return labImages.value.map((item, index) => [
     `#${index + 1} ${item.file.name}`,
-    `type: ${item.file.type || 'unknown'}`,
-    `size: ${formatBytes(item.file.size)}`,
-    `dimension: ${item.width} × ${item.height}`,
-    `lastModified: ${new Date(item.file.lastModified).toLocaleString()}`,
+    `${t('tools.image.metadataLabels.type')}: ${item.file.type || t('tools.image.unknown')}`,
+    `${t('tools.image.metadataLabels.size')}: ${formatBytes(item.file.size)}`,
+    `${t('tools.image.metadataLabels.dimension')}: ${item.width} × ${item.height}`,
+    `${t('tools.image.metadataLabels.lastModified')}: ${new Date(item.file.lastModified).toLocaleString()}`,
   ].join('\n')).join('\n\n')
 })
 
@@ -181,7 +193,7 @@ function loadImageSource(file: File): Promise<ImageSource> {
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => resolve({ file, url, width: img.naturalWidth, height: img.naturalHeight })
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error(t('tools.image.imageLoadFailed'))) }
     img.src = url
   })
 }
@@ -190,7 +202,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('图片加载失败'))
+    img.onerror = () => reject(new Error(t('tools.image.imageLoadFailed')))
     img.src = url
   })
 }
@@ -198,7 +210,7 @@ function loadImage(url: string): Promise<HTMLImageElement> {
 function canvasToResult(canvas: HTMLCanvasElement, name: string, type = 'image/png', qualityValue = 0.92): Promise<void> {
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
-      if (!blob) { reject(new Error('导出失败')); return }
+      if (!blob) { reject(new Error(t('tools.image.exportFailed'))); return }
       clearLabResult()
       labResultUrl.value = URL.createObjectURL(blob)
       labResultName.value = name
@@ -226,7 +238,7 @@ async function processAll() {
         item.resultName = item.file.name.replace(/\.[^.]+$/, '') + '_compressed.jpg'
         item.ratio = ((1 - file.size / item.file.size) * 100).toFixed(1) + '%'
       } catch {
-        item.error = '失败'
+        item.error = t('tools.image.failed')
       } finally {
         item.loading = false
       }
@@ -245,7 +257,7 @@ async function processAll() {
       item.error = ''
       const img = new window.Image()
       img.onload = () => processCanvasItem(item, img)
-      img.onerror = () => { item.error = '加载失败'; item.processing = false }
+      img.onerror = () => { item.error = t('tools.image.loadFailed'); item.processing = false }
       img.src = item.preview
     })
   }
@@ -316,7 +328,7 @@ function processCanvasItem(item: FileItem, img: HTMLImageElement) {
   }
 
   canvas.toBlob((blob) => {
-    if (!blob) { item.error = '导出失败'; item.processing = false; return }
+    if (!blob) { item.error = t('tools.image.exportFailed'); item.processing = false; return }
     const extMap: Record<string, string> = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }
     if (batchOp.value === 'format') item.resultName = item.file.name.replace(/\.[^.]+$/, '') + (extMap[targetFormat.value] || '.jpg')
     else item.resultName = item.file.name.replace(/\.[^.]+$/, '') + `_${batchOp.value}.jpg`
@@ -347,7 +359,7 @@ async function generatePhantomTank() {
   const whiteSource = labImages.value[phantomWhiteIndex.value]
   const blackSource = labImages.value[phantomBlackIndex.value]
   if (!whiteSource || !blackSource || phantomWhiteIndex.value === phantomBlackIndex.value) {
-    labError.value = '需要选择两张不同图片：白底可见图与黑底可见图'
+    labError.value = t('tools.image.needDifferentPhantomImages')
     return
   }
 
@@ -385,7 +397,7 @@ async function generatePhantomTank() {
 }
 
 async function stitchImages() {
-  if (!labImages.value.length) { labError.value = '请先上传图片'; return }
+  if (!labImages.value.length) { labError.value = t('tools.image.uploadImagesFirst'); return }
   try {
     const images = await Promise.all(labImages.value.map((item) => loadImage(item.url)))
     const gap = Math.max(0, stitchGap.value)
@@ -428,7 +440,7 @@ async function stitchImages() {
 
 async function stripMetadata() {
   const source = labImages.value[0]
-  if (!source) { labError.value = '请先上传图片'; return }
+  if (!source) { labError.value = t('tools.image.uploadImagesFirst'); return }
   try {
     const img = await loadImage(source.url)
     const canvas = document.createElement('canvas')
@@ -443,7 +455,7 @@ async function stripMetadata() {
 
 async function applyVisualEditor() {
   const source = labImages.value[0]
-  if (!source) { labError.value = '请先上传图片'; return }
+  if (!source) { labError.value = t('tools.image.uploadImagesFirst'); return }
   try {
     const img = await loadImage(source.url)
     const canvas = document.createElement('canvas')
@@ -462,7 +474,7 @@ async function applyVisualEditor() {
 
 async function exportFirstGifFrame() {
   const source = labImages.value[0]
-  if (!source) { labError.value = '请先上传 GIF'; return }
+  if (!source) { labError.value = t('tools.image.uploadGifFirst'); return }
   try {
     const img = await loadImage(source.url)
     const canvas = document.createElement('canvas')
@@ -482,7 +494,7 @@ async function inspectGif() {
   const bytes = new Uint8Array(buffer)
   const header = String.fromCharCode(...bytes.slice(0, 6))
   if (!header.startsWith('GIF')) {
-    gifInfo.value = '当前首图不是 GIF，可上传多张静态图片生成简单 GIF。'
+    gifInfo.value = t('tools.image.firstImageNotGif')
     return
   }
   let imageCount = 0
@@ -491,11 +503,16 @@ async function inspectGif() {
     if (bytes[i] === 0x2c) imageCount++
     if (bytes[i] === 0x21 && bytes[i + 1] === 0xf9) gceCount++
   }
-  gifInfo.value = [`format: ${header}`, `frames: ${Math.max(imageCount, gceCount)}`, `size: ${formatBytes(source.file.size)}`, `dimension: ${source.width} × ${source.height}`].join('\n')
+  gifInfo.value = [
+    `${t('tools.image.metadataLabels.format')}: ${header}`,
+    `${t('tools.image.metadataLabels.frames')}: ${Math.max(imageCount, gceCount)}`,
+    `${t('tools.image.metadataLabels.size')}: ${formatBytes(source.file.size)}`,
+    `${t('tools.image.metadataLabels.dimension')}: ${source.width} × ${source.height}`,
+  ].join('\n')
 }
 
 async function createGif() {
-  if (!labImages.value.length) { labError.value = '请先上传图片序列'; return }
+  if (!labImages.value.length) { labError.value = t('tools.image.uploadImageSequenceFirst'); return }
   try {
     const images = await Promise.all(labImages.value.map((item) => loadImage(item.url)))
     const width = Math.min(Math.max(...images.map((img) => img.width)), 480)
@@ -612,80 +629,80 @@ watch(labOp, () => {
 <template>
   <ToolPage name="image" max-width="6xl">
     <template #actions>
-      <UTabs v-model="activeMode" :items="[{ label: '批处理', value: 'batch', icon: 'i-lucide-images' }, { label: '实验室', value: 'lab', icon: 'i-lucide-wand-sparkles' }]" />
+      <UTabs v-model="activeMode" :items="[{ label: $t('tools.image.modes.batch'), value: 'batch', icon: 'i-lucide-images' }, { label: $t('tools.image.modes.lab'), value: 'lab', icon: 'i-lucide-wand-sparkles' }]" />
     </template>
 
     <div v-if="activeMode === 'batch'" class="space-y-5">
-      <ToolSection title="处理参数" compact>
-        <UTabs v-model="batchOp" :items="batchOps.map((op) => ({ label: op.label, value: op.value, icon: op.icon }))" />
+      <ToolSection :title="$t('tools.image.paramsTitle')" compact>
+        <UTabs v-model="batchOp" :items="batchOps.map((op) => ({ label: $t(op.labelKey), value: op.value, icon: op.icon }))" />
         <div class="hig-subtle-surface mt-4 grid gap-4 rounded-[1.75rem] border p-4 sm:grid-cols-2 lg:grid-cols-4">
           <template v-if="batchOp === 'compress'">
-            <UFormField :label="`质量 ${Math.round(quality * 100)}%`">
+            <UFormField :label="$t('tools.image.qualityValue', { value: Math.round(quality * 100) })">
               <USlider v-model="quality" :min="0.1" :max="1" :step="0.1" />
             </UFormField>
-            <UFormField label="最大宽高">
+            <UFormField :label="$t('tools.image.maxDimensions')">
               <UInput v-model.number="maxWidth" class="w-full" />
             </UFormField>
           </template>
           <template v-if="batchOp === 'format'">
-            <UFormField label="目标格式">
+            <UFormField :label="$t('tools.image.targetFormat')">
               <USelect v-model="targetFormat" :items="[{ label: 'JPEG', value: 'image/jpeg' }, { label: 'PNG', value: 'image/png' }, { label: 'WebP', value: 'image/webp' }]" class="w-full" />
             </UFormField>
           </template>
           <template v-if="batchOp === 'resize'">
-            <UFormField label="宽度">
+            <UFormField :label="$t('tools.image.width')">
               <UInput v-model.number="resizeWidth" class="w-full" />
             </UFormField>
-            <UFormField label="高度">
+            <UFormField :label="$t('tools.image.height')">
               <UInput v-model.number="resizeHeight" class="w-full" />
             </UFormField>
             <div class="flex items-end pb-1">
-              <UCheckbox v-model="keepRatio" label="保持比例" />
+              <UCheckbox v-model="keepRatio" :label="$t('tools.image.keepRatio')" />
             </div>
           </template>
           <template v-if="batchOp === 'watermark'">
-            <UFormField label="文字">
+            <UFormField :label="$t('tools.image.text')">
               <UInput v-model="wmText" class="w-full" />
             </UFormField>
-            <UFormField :label="`大小 ${wmSize}`">
+            <UFormField :label="$t('tools.image.wmSizeValue', { value: wmSize })">
               <USlider v-model="wmSize" :min="12" :max="72" :step="1" />
             </UFormField>
-            <UFormField label="颜色">
+            <UFormField :label="$t('tools.image.wmColor')">
               <UColorPicker v-model="wmColor" />
             </UFormField>
-            <UFormField label="位置">
-              <USelect v-model="wmPos" :items="[{ label: '居中', value: 'center' }, { label: '左上', value: 'top-left' }, { label: '右上', value: 'top-right' }, { label: '左下', value: 'bottom-left' }, { label: '右下', value: 'bottom-right' }]" class="w-full" />
+            <UFormField :label="$t('tools.image.wmPos')">
+              <USelect v-model="wmPos" :items="[{ label: $t('tools.image.pos.center'), value: 'center' }, { label: $t('tools.image.pos.topLeft'), value: 'top-left' }, { label: $t('tools.image.pos.topRight'), value: 'top-right' }, { label: $t('tools.image.pos.bottomLeft'), value: 'bottom-left' }, { label: $t('tools.image.pos.bottomRight'), value: 'bottom-right' }]" class="w-full" />
             </UFormField>
           </template>
           <template v-if="batchOp === 'rotate'">
-            <UFormField label="旋转角度">
+            <UFormField :label="$t('tools.image.rotateDeg')">
               <USelect v-model="rotateDeg" :items="[{ label: '90°', value: 90 }, { label: '180°', value: 180 }, { label: '270°', value: 270 }]" class="w-full" />
             </UFormField>
           </template>
           <template v-if="batchOp === 'crop'">
-            <UFormField label="上">
+            <UFormField :label="$t('tools.image.cropTop')">
               <UInput v-model.number="cropTop" class="w-full" />
             </UFormField>
-            <UFormField label="右">
+            <UFormField :label="$t('tools.image.cropRight')">
               <UInput v-model.number="cropRight" class="w-full" />
             </UFormField>
-            <UFormField label="下">
+            <UFormField :label="$t('tools.image.cropBottom')">
               <UInput v-model.number="cropBottom" class="w-full" />
             </UFormField>
-            <UFormField label="左">
+            <UFormField :label="$t('tools.image.cropLeft')">
               <UInput v-model.number="cropLeft" class="w-full" />
             </UFormField>
           </template>
         </div>
       </ToolSection>
 
-      <ToolSection title="上传与处理" compact>
-        <template #actions><UButton color="primary" icon="i-lucide-play" class="rounded-full" :disabled="!files.length" @click="processAll">全部处理</UButton></template>
-        <FileDropZone accept="image/*" multiple title="拖拽图片或点击上传" icon="i-lucide-image-up" ui-base="h-36 hig-subtle-surface rounded-[1.75rem] border-2 border-dashed transition-colors hover:border-primary/40 hover:bg-primary/5" @files="addFiles" />
+      <ToolSection :title="$t('tools.image.uploadAndProcess')" compact>
+        <template #actions><UButton color="primary" icon="i-lucide-play" class="rounded-full" :disabled="!files.length" @click="processAll">{{ $t('tools.image.processAll') }}</UButton></template>
+        <FileDropZone accept="image/*" multiple :title="$t('tools.image.dropImages')" icon="i-lucide-image-up" ui-base="h-36 hig-subtle-surface rounded-[1.75rem] border-2 border-dashed transition-colors hover:border-primary/40 hover:bg-primary/5" @files="addFiles" />
         <div v-if="files.length" class="mt-4 space-y-3">
           <div v-for="(item, i) in files" :key="`${item.file.name}-${item.file.size}-${item.file.lastModified}`" class="flex items-center gap-3 tool-list-item">
             <img :src="item.preview" class="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-sm" />
-            <div class="min-w-0 flex-1"><div class="truncate text-sm">{{ item.file.name }}</div><UBadge v-if="item.error" color="error" variant="soft" size="xs">{{ item.error }}</UBadge><UBadge v-else-if="item.loading" color="info" variant="soft" size="xs">压缩中...</UBadge><UBadge v-else-if="item.processing" color="info" variant="soft" size="xs">处理中...</UBadge><div v-else-if="item.resultFile" class="text-xs text-success">已完成 <span v-if="item.ratio" class="ml-1">(-{{ item.ratio }})</span></div></div>
+            <div class="min-w-0 flex-1"><div class="truncate text-sm">{{ item.file.name }}</div><UBadge v-if="item.error" color="error" variant="soft" size="xs">{{ item.error }}</UBadge><UBadge v-else-if="item.loading" color="info" variant="soft" size="xs">{{ $t('tools.image.compressing') }}</UBadge><UBadge v-else-if="item.processing" color="info" variant="soft" size="xs">{{ $t('tools.image.processing') }}</UBadge><div v-else-if="item.resultFile" class="text-xs text-success">{{ $t('tools.image.done') }} <span v-if="item.ratio" class="ml-1">(-{{ item.ratio }})</span></div></div>
             <UButton v-if="item.resultFile && item.resultUrl" color="primary" variant="ghost" icon="i-lucide-download" class="rounded-full" @click="downloadItem(item)" />
             <UButton color="neutral" variant="ghost" icon="i-lucide-trash2" class="rounded-full" @click="removeItem(i)" />
           </div>
@@ -694,9 +711,9 @@ watch(labOp, () => {
     </div>
 
     <div v-else class="space-y-5">
-      <ToolSection title="媒体实验室" description="幻影坦克、拼接、元数据清理、GIF 生成/拆帧与轻量可视编辑。" compact>
-        <UTabs v-model="labOp" :items="labOps.map((op) => ({ label: op.label, value: op.value, icon: op.icon }))" />
-        <FileDropZone class="mt-4" accept="image/*" multiple title="上传图片素材" icon="i-lucide-images" @files="addLabFiles" />
+      <ToolSection :title="$t('tools.image.labTitle')" :description="$t('tools.image.labDesc')" compact>
+        <UTabs v-model="labOp" :items="labOps.map((op) => ({ label: $t(op.labelKey), value: op.value, icon: op.icon }))" />
+        <FileDropZone class="mt-4" accept="image/*" multiple :title="$t('tools.image.uploadMaterials')" icon="i-lucide-images" @files="addLabFiles" />
         <div v-if="labImages.length" class="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           <div v-for="(item, i) in labImages" :key="item.url" class="tool-list-item group relative overflow-hidden p-2">
             <img :src="item.url" class="h-28 w-full rounded-xl object-cover" />
@@ -706,87 +723,87 @@ watch(labOp, () => {
         </div>
       </ToolSection>
 
-      <ToolSection :title="labOps.find((op) => op.value === labOp)?.label || '处理'" compact>
+      <ToolSection :title="activeLabTitle" compact>
         <div v-if="labOp === 'phantom'" class="space-y-4">
           <UAlert
             color="info"
             variant="soft"
             icon="i-lucide-info"
-            description="选择白底可见图和黑底可见图后生成透明 PNG。若效果相反，可点击交换两图重新生成。"
+            :description="$t('tools.image.phantomDescription')"
           />
           <div class="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_1fr] md:items-end">
-            <UFormField label="白底可见图">
+            <UFormField :label="$t('tools.image.whiteVisibleImage')">
               <USelect v-model="phantomWhiteIndex" :items="phantomImageOptions" :disabled="labImages.length < 2" class="w-full" @update:model-value="clearLabResult" />
             </UFormField>
             <UButton color="neutral" variant="soft" icon="i-lucide-arrow-left-right" class="rounded-full" :disabled="labImages.length < 2" @click="swapPhantomRoles">
-              交换
+              {{ $t('app.swap') }}
             </UButton>
-            <UFormField label="黑底可见图">
+            <UFormField :label="$t('tools.image.blackVisibleImage')">
               <USelect v-model="phantomBlackIndex" :items="phantomImageOptions" :disabled="labImages.length < 2" class="w-full" @update:model-value="clearLabResult" />
             </UFormField>
           </div>
           <div class="flex flex-wrap gap-2">
             <UButton color="primary" icon="i-lucide-wand-sparkles" class="rounded-full" :disabled="labImages.length < 2 || phantomWhiteIndex === phantomBlackIndex" @click="generatePhantomTank">
-              生成幻影坦克
+              {{ $t('tools.image.generatePhantom') }}
             </UButton>
             <UBadge v-if="labImages.length >= 2 && phantomWhiteIndex === phantomBlackIndex" color="warning" variant="soft" class="rounded-full">
-              请选择两张不同图片
+              {{ $t('tools.image.chooseDifferentImages') }}
             </UBadge>
           </div>
         </div>
         <div v-if="labOp === 'stitch'" class="hig-subtle-surface grid gap-4 rounded-[1.75rem] border p-4 sm:grid-cols-3">
-          <UFormField label="方向">
-            <USelect v-model="stitchDirection" :items="[{ label: '纵向', value: 'vertical' }, { label: '横向', value: 'horizontal' }, { label: '网格', value: 'grid' }]" class="w-full" />
+          <UFormField :label="$t('tools.image.direction')">
+            <USelect v-model="stitchDirection" :items="[{ label: $t('tools.image.directions.vertical'), value: 'vertical' }, { label: $t('tools.image.directions.horizontal'), value: 'horizontal' }, { label: $t('tools.image.directions.grid'), value: 'grid' }]" class="w-full" />
           </UFormField>
-          <UFormField label="间距">
+          <UFormField :label="$t('tools.image.gap')">
             <UInput v-model.number="stitchGap" class="w-full" />
           </UFormField>
-          <UFormField label="背景">
+          <UFormField :label="$t('tools.image.background')">
             <UColorPicker v-model="stitchBg" />
           </UFormField>
           <div class="sm:col-span-3">
-            <UButton color="primary" icon="i-lucide-gallery-horizontal" class="rounded-full" :disabled="!labImages.length" @click="stitchImages">拼接图片</UButton>
+            <UButton color="primary" icon="i-lucide-gallery-horizontal" class="rounded-full" :disabled="!labImages.length" @click="stitchImages">{{ $t('tools.image.stitchImages') }}</UButton>
           </div>
         </div>
         <div v-if="labOp === 'metadata'" class="space-y-3">
           <pre class="hig-subtle-surface max-h-80 overflow-auto rounded-[1.35rem] border p-4 text-xs text-toned">{{ metadataText }}</pre>
-          <UButton color="primary" icon="i-lucide-eraser" class="rounded-full" :disabled="!labImages.length" @click="stripMetadata">重绘并清理元数据</UButton>
+          <UButton color="primary" icon="i-lucide-eraser" class="rounded-full" :disabled="!labImages.length" @click="stripMetadata">{{ $t('tools.image.redrawAndCleanMetadata') }}</UButton>
         </div>
         <div v-if="labOp === 'gif'" class="space-y-3">
           <div class="hig-subtle-surface grid gap-4 rounded-[1.75rem] border p-4 sm:grid-cols-[1fr_auto_auto] sm:items-end">
-            <UFormField label="帧间隔(ms)">
+            <UFormField :label="$t('tools.image.frameDelay')">
               <UInput v-model.number="gifDelay" class="w-full" />
             </UFormField>
-            <UButton color="primary" icon="i-lucide-film" class="rounded-full" :disabled="!labImages.length" @click="createGif">图片转 GIF</UButton>
-            <UButton color="neutral" variant="soft" icon="i-lucide-split" class="rounded-full" :disabled="!labImages.length" @click="exportFirstGifFrame">导出 GIF 首帧</UButton>
+            <UButton color="primary" icon="i-lucide-film" class="rounded-full" :disabled="!labImages.length" @click="createGif">{{ $t('tools.image.imagesToGif') }}</UButton>
+            <UButton color="neutral" variant="soft" icon="i-lucide-split" class="rounded-full" :disabled="!labImages.length" @click="exportFirstGifFrame">{{ $t('tools.image.exportGifFirstFrame') }}</UButton>
           </div>
           <pre v-if="gifInfo" class="hig-subtle-surface rounded-[1.35rem] border p-4 text-xs text-toned">{{ gifInfo }}</pre>
         </div>
         <div v-if="labOp === 'editor'" class="space-y-4">
           <div class="hig-subtle-surface grid grid-cols-1 gap-4 rounded-[1.75rem] border p-4 md:grid-cols-4">
-            <UFormField :label="`亮度 ${editorBrightness}%`"><USlider v-model="editorBrightness" :min="0" :max="200" /></UFormField>
-            <UFormField :label="`对比 ${editorContrast}%`"><USlider v-model="editorContrast" :min="0" :max="200" /></UFormField>
-            <UFormField :label="`饱和 ${editorSaturation}%`"><USlider v-model="editorSaturation" :min="0" :max="200" /></UFormField>
-            <UFormField :label="`模糊 ${editorBlur}px`"><USlider v-model="editorBlur" :min="0" :max="12" /></UFormField>
+            <UFormField :label="$t('tools.image.brightnessValue', { value: editorBrightness })"><USlider v-model="editorBrightness" :min="0" :max="200" /></UFormField>
+            <UFormField :label="$t('tools.image.contrastValue', { value: editorContrast })"><USlider v-model="editorContrast" :min="0" :max="200" /></UFormField>
+            <UFormField :label="$t('tools.image.saturationValue', { value: editorSaturation })"><USlider v-model="editorSaturation" :min="0" :max="200" /></UFormField>
+            <UFormField :label="$t('tools.image.blurValue', { value: editorBlur })"><USlider v-model="editorBlur" :min="0" :max="12" /></UFormField>
           </div>
           <div class="flex flex-wrap items-center gap-4">
-            <UCheckbox v-model="editorFlipX" label="水平翻转" />
-            <UCheckbox v-model="editorFlipY" label="垂直翻转" />
-            <UButton color="primary" icon="i-lucide-sliders-horizontal" class="rounded-full" :disabled="!labImages.length" @click="applyVisualEditor">应用编辑</UButton>
+            <UCheckbox v-model="editorFlipX" :label="$t('tools.image.flipHorizontal')" />
+            <UCheckbox v-model="editorFlipY" :label="$t('tools.image.flipVertical')" />
+            <UButton color="primary" icon="i-lucide-sliders-horizontal" class="rounded-full" :disabled="!labImages.length" @click="applyVisualEditor">{{ $t('tools.image.applyEdit') }}</UButton>
           </div>
         </div>
         <UAlert v-if="labError" class="mt-4" color="error" variant="soft" icon="i-lucide-circle-alert" :description="labError" />
       </ToolSection>
 
-      <ToolSection v-if="labResultUrl" title="输出预览" compact>
-        <template #actions><UButton icon="i-lucide-download" color="primary" class="rounded-full" @click="downloadLabResult">下载结果</UButton></template>
+      <ToolSection v-if="labResultUrl" :title="$t('tools.image.outputPreview')" compact>
+        <template #actions><UButton icon="i-lucide-download" color="primary" class="rounded-full" @click="downloadLabResult">{{ $t('tools.image.downloadResult') }}</UButton></template>
         <div v-if="labOp === 'phantom'" class="grid gap-4 md:grid-cols-2">
           <div class="rounded-[1.75rem] border border-white/70 p-4 shadow-inner shadow-black/5" style="background-color: #fff;">
-            <div class="mb-3 text-xs font-semibold uppercase tracking-wider" style="color: #64748b;">浅色背景</div>
+            <div class="mb-3 text-xs font-semibold uppercase tracking-wider" style="color: #64748b;">{{ $t('tools.image.lightBackground') }}</div>
             <img :src="labResultUrl" class="mx-auto max-h-[420px] max-w-full rounded-2xl object-contain" />
           </div>
           <div class="rounded-[1.75rem] border border-white/10 p-4 shadow-inner shadow-black/40" style="background-color: #020617;">
-            <div class="mb-3 text-xs font-semibold uppercase tracking-wider" style="color: #cbd5e1;">深色背景</div>
+            <div class="mb-3 text-xs font-semibold uppercase tracking-wider" style="color: #cbd5e1;">{{ $t('tools.image.darkBackground') }}</div>
             <img :src="labResultUrl" class="mx-auto max-h-[420px] max-w-full rounded-2xl object-contain" />
           </div>
         </div>

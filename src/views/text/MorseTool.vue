@@ -4,8 +4,10 @@ import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
+import { useRouteQueryValue } from '@/utils/routeQuery'
 
 const mode = usePersistedRef<'encode' | 'decode'>('web-tools:morse:mode', 'encode')
+useRouteQueryValue('mode', mode, ['encode', 'decode'])
 const input = usePersistedRef('web-tools:morse:input', 'HELLO WORLD')
 
 const map: Record<string, string> = {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import dayjs from 'dayjs'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
@@ -7,6 +8,8 @@ import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { useToolState } from '@/composables'
 import { usePersistedRef } from '@/utils/persist'
+
+const { t } = useI18n()
 
 const nowTs = ref(Math.floor(Date.now() / 1000))
 const nowMs = ref(Date.now())
@@ -62,15 +65,26 @@ const tzResult = computed(() => {
 })
 
 const timezones = [
-  { label: 'UTC', value: '+00:00' },
-  { label: '北京/上海', value: '+08:00' },
-  { label: '东京', value: '+09:00' },
-  { label: '纽约', value: '-05:00' },
-  { label: '洛杉矶', value: '-08:00' },
-  { label: '伦敦', value: '+00:00' },
-  { label: '巴黎', value: '+01:00' },
-  { label: '悉尼', value: '+11:00' },
+  { key: 'utc', value: '+00:00' },
+  { key: 'beijing', value: '+08:00' },
+  { key: 'tokyo', value: '+09:00' },
+  { key: 'newYork', value: '-05:00' },
+  { key: 'losAngeles', value: '-08:00' },
+  { key: 'london', value: '+00:00' },
+  { key: 'paris', value: '+01:00' },
+  { key: 'sydney', value: '+11:00' },
 ]
+
+const timestampUnitOptions = computed(() => [
+  { label: t('tools.timestamp.second'), value: 's' },
+  { label: t('tools.timestamp.millisecond'), value: 'ms' },
+])
+const timezoneOptions = computed(() =>
+  timezones.map((timezone) => ({
+    label: `${t(`tools.timestamp.timezones.${timezone.key}`)} (${timezone.value})`,
+    value: timezone.value,
+  })),
+)
 
 const diffDate1 = usePersistedRef('web-tools:ts:diffDate1', dayjs().format('YYYY-MM-DD'))
 const diffDate2 = usePersistedRef('web-tools:ts:diffDate2', dayjs().add(7, 'day').format('YYYY-MM-DD'))
@@ -82,52 +96,52 @@ const diffResult = computed(() => {
 </script>
 
 <template>
-  <ToolPage name="timestamp" max-width="6xl">
+  <ToolPage name="timestamp" max-width="6xl" icon="i-lucide-calendar-clock">
     <div class="tool-workspace">
       <div class="space-y-4">
-        <ToolSection title="日期与时间戳转换" description="把常用时间格式、Unix 时间戳和不同时区集中在一个操作面板里。">
+        <ToolSection :title="$t('tools.timestamp.convertTitle')" :description="$t('tools.timestamp.convertDesc')">
           <div class="space-y-5">
             <div class="tool-command-bar justify-between">
               <div>
-                <div class="text-xs font-extrabold uppercase tracking-[0.18em] text-muted">Live Clock</div>
+                <div class="text-xs font-extrabold uppercase tracking-[0.18em] text-muted">{{ $t('tools.timestamp.liveClock') }}</div>
                 <div class="mt-1 text-sm text-muted">{{ nowDate }}</div>
               </div>
               <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
             </div>
 
             <div class="tool-control-grid">
-              <UFormField label="日期转时间戳" description="支持 YYYY-MM-DD HH:mm:ss 等常见格式。">
+              <UFormField :label="$t('tools.timestamp.dateToTimestamp')" :description="$t('tools.timestamp.dateToTimestampDesc')">
                 <UInput v-model="dateInput" @blur="saveHistory" placeholder="YYYY-MM-DD HH:mm:ss" class="w-full" />
               </UFormField>
-              <UFormField label="时间戳转日期">
+              <UFormField :label="$t('tools.timestamp.timestampToDate')">
                 <div class="flex gap-2">
-                  <UInput v-model="tsInput" placeholder="输入时间戳" class="min-w-0 flex-1" />
-                  <USelect v-model="tsUnit" :items="[{ label: '秒', value: 's' }, { label: '毫秒', value: 'ms' }]" class="w-28" />
+                  <UInput v-model="tsInput" :placeholder="$t('tools.timestamp.tsPlaceholder')" class="min-w-0 flex-1" />
+                  <USelect v-model="tsUnit" :items="timestampUnitOptions" class="w-28" />
                 </div>
               </UFormField>
             </div>
           </div>
         </ToolSection>
 
-        <ToolSection title="时区与差值" description="快速换算固定 UTC 偏移，并计算两个日期之间的跨度。">
+        <ToolSection :title="$t('tools.timestamp.timezoneAndDiff')" :description="$t('tools.timestamp.timezoneAndDiffDesc')">
           <div class="space-y-5">
             <div class="tool-control-grid">
-              <UFormField label="原始时间">
+              <UFormField :label="$t('tools.timestamp.originalTime')">
                 <UInput v-model="tzDate" placeholder="YYYY-MM-DD HH:mm:ss" class="w-full" />
               </UFormField>
-              <UFormField label="从时区">
-                <USelect v-model="tzFrom" :items="timezones.map(tz => ({ label: `${tz.label} (${tz.value})`, value: tz.value }))" class="w-full" />
+              <UFormField :label="$t('tools.timestamp.fromTimezone')">
+                <USelect v-model="tzFrom" :items="timezoneOptions" class="w-full" />
               </UFormField>
-              <UFormField label="到时区">
-                <USelect v-model="tzTo" :items="timezones.map(tz => ({ label: `${tz.label} (${tz.value})`, value: tz.value }))" class="w-full" />
+              <UFormField :label="$t('tools.timestamp.toTimezone')">
+                <USelect v-model="tzTo" :items="timezoneOptions" class="w-full" />
               </UFormField>
             </div>
 
             <div class="tool-control-grid">
-              <UFormField label="开始日期">
+              <UFormField :label="$t('tools.timestamp.startDate')">
                 <UInput v-model="diffDate1" type="date" class="w-full" />
               </UFormField>
-              <UFormField label="结束日期">
+              <UFormField :label="$t('tools.timestamp.endDate')">
                 <UInput v-model="diffDate2" type="date" class="w-full" />
               </UFormField>
             </div>
@@ -136,34 +150,34 @@ const diffResult = computed(() => {
       </div>
 
       <div class="tool-preview-sticky space-y-4">
-        <ToolSection title="实时结果" compact>
+        <ToolSection :title="$t('tools.timestamp.liveResult')" compact>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-            <ResultPanel title="本地时间" :value="nowDate" color="primary" :monospace="false" compact />
-            <ResultPanel title="当前秒级时间戳" :value="String(nowTs)" compact />
-            <ResultPanel title="当前毫秒时间戳" :value="String(nowMs)" compact />
+            <ResultPanel :title="$t('tools.timestamp.localTime')" :value="nowDate" color="primary" :monospace="false" compact />
+            <ResultPanel :title="$t('tools.timestamp.currentSecondTimestamp')" :value="String(nowTs)" compact />
+            <ResultPanel :title="$t('tools.timestamp.currentMillisecondTimestamp')" :value="String(nowMs)" compact />
           </div>
         </ToolSection>
 
-        <ToolSection title="转换输出" compact>
+        <ToolSection :title="$t('tools.timestamp.convertOutput')" compact>
           <div class="space-y-3">
             <div v-if="dateTs" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              <ResultPanel title="日期 → 秒" :value="String(dateTs.s)" compact />
-              <ResultPanel title="日期 → 毫秒" :value="String(dateTs.ms)" compact />
+              <ResultPanel :title="$t('tools.timestamp.dateToSecond')" :value="String(dateTs.s)" compact />
+              <ResultPanel :title="$t('tools.timestamp.dateToMillisecond')" :value="String(dateTs.ms)" compact />
             </div>
-            <ResultPanel v-if="tsDate" title="时间戳 → 日期" :value="tsDate" compact />
-            <ResultPanel v-if="tzResult" title="时区转换" :value="tzResult" compact />
+            <ResultPanel v-if="tsDate" :title="$t('tools.timestamp.timestampToDateResult')" :value="tsDate" compact />
+            <ResultPanel v-if="tzResult" :title="$t('tools.timestamp.timezoneConvertResult')" :value="tzResult" compact />
             <div v-if="diffResult" class="grid grid-cols-3 gap-3">
               <div class="tool-metric-card text-center">
                 <div class="text-2xl font-bold text-primary">{{ diffResult.days }}</div>
-                <div class="text-xs text-muted">天</div>
+                <div class="text-xs text-muted">{{ $t('tools.timestamp.days') }}</div>
               </div>
               <div class="tool-metric-card text-center">
                 <div class="text-2xl font-bold text-primary">{{ diffResult.hours }}</div>
-                <div class="text-xs text-muted">小时</div>
+                <div class="text-xs text-muted">{{ $t('tools.timestamp.hours') }}</div>
               </div>
               <div class="tool-metric-card text-center">
                 <div class="text-2xl font-bold text-primary">{{ diffResult.minutes }}</div>
-                <div class="text-xs text-muted">分钟</div>
+                <div class="text-xs text-muted">{{ $t('tools.timestamp.minutes') }}</div>
               </div>
             </div>
           </div>

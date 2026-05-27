@@ -9,6 +9,7 @@ import ToolSection from '@/components/tool/ToolSection.vue'
 import { allowExternalFetchOnce } from '@/security/sameOriginNetwork'
 import { useHistory } from '@/utils/history'
 import { usePersistedRef } from '@/utils/persist'
+import { useRouteQueryValue } from '@/utils/routeQuery'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS'
 type BodyMode = 'none' | 'json' | 'text' | 'form'
@@ -60,6 +61,7 @@ const response = ref<ResponseState | null>(null)
 const errorMessage = ref('')
 const loading = ref(false)
 const activeConfigTab = ref<'query' | 'headers' | 'body'>('query')
+useRouteQueryValue('tab', activeConfigTab, ['query', 'headers', 'body'])
 const responseBodyMode = ref<'formatted' | 'raw'>('formatted')
 const curlImportText = ref('')
 const curlImportError = ref('')

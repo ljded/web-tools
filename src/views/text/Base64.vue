@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useToolState, useFileHandler } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
+import { useRouteQueryValue } from '@/utils/routeQuery'
 
 const MAX_TEXT_CONVERT_CHARS = 2_000_000
 const MAX_FILE_ENCODE_BYTES = 500 * 1024 * 1024
 
+const { t } = useI18n()
 const mode = ref<'encode' | 'decode'>('encode')
+useRouteQueryValue('mode', mode, ['encode', 'decode'])
 const result = ref('')
 const addDataUri = ref(false)
 const imgPreview = ref('')
@@ -23,7 +27,7 @@ const { input, history, saveHistory } = useToolState<string, { mode: 'encode' | 
   getHistoryData: (value) => ({ mode: mode.value, input: value }),
   historyOptions: {
     maxCount: 15,
-    generateLabel: (d) => `[${d.mode === 'encode' ? '编码' : '解码'}] ${d.input.slice(0, 40)}${d.input.length > 40 ? '...' : ''}`,
+    generateLabel: (d) => `[${d.mode === 'encode' ? t('tools.base64.encode') : t('tools.base64.decode')}] ${d.input.slice(0, 40)}${d.input.length > 40 ? '...' : ''}`,
   },
 })
 
@@ -94,7 +98,7 @@ function computeResult() {
   try {
     if (mode.value === 'encode') {
       isLargeDecode.value = false
-      if (input.value.length > MAX_TEXT_CONVERT_CHARS) { result.value = `输入过长...`; return }
+      if (input.value.length > MAX_TEXT_CONVERT_CHARS) { result.value = t('tools.base64.inputTooLong', { max: MAX_TEXT_CONVERT_CHARS.toLocaleString() }); return }
       const bytes = new TextEncoder().encode(input.value)
       const bin = new Uint8Array(bytes)
       let str = ''
@@ -105,13 +109,13 @@ function computeResult() {
       isLargeDecode.value = clean.length >= 2_000_000
       if (clean.startsWith('data:image')) { result.value = isLargeDecode.value ? '' : clean.split(',')[1] || clean; return }
       if (looksLikeImageBase64(clean)) { result.value = isLargeDecode.value ? '' : clean; return }
-      if (isLargeDecode.value) { result.value = '输入过大（疑似二进制数据），已跳过文本解码，请查看图片预览或下载文件'; return }
+      if (isLargeDecode.value) { result.value = t('tools.base64.largeDecode'); return }
       const bin = atob(clean)
       const bytes = new Uint8Array(bin.length)
       for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
       result.value = new TextDecoder().decode(bytes)
     }
-  } catch { result.value = '转换失败，请检查输入内容' }
+  } catch { result.value = t('tools.base64.convertError') }
 }
 
 let computeTimer: ReturnType<typeof setTimeout> | null = null
@@ -135,8 +139,8 @@ const finalResult = computed(() => {
 
 const resultDisplay = computed(() => {
   if (fileHandler.file.value && fileBase64.value.length > 100_000)
-    return fileBase64.value.slice(0, 500) + '\n...（内容过长已折叠）'
-  if (isLargeDecode.value && !result.value) return '输入为大型 Base64 数据，已跳过文本展示，请使用下方下载按钮'
+    return fileBase64.value.slice(0, 500) + '\n' + t('tools.base64.contentFolded')
+  if (isLargeDecode.value && !result.value) return t('tools.base64.largeDecodeDisplay')
   return finalResult.value
 })
 
@@ -172,7 +176,7 @@ function switchMode() {
 function handleFileUpload(e: Event) { const file = (e.target as HTMLInputElement).files?.[0]; if (file) setFile(file) }
 function setFile(f: File) {
   encodeError.value = ''
-  if (!fileHandler.setFile(f)) { encodeError.value = fileHandler.error.value; return }
+  if (!fileHandler.setFile(f)) { encodeError.value = t('tools.base64.fileTooLarge', { size: fileHandler.formatSize(MAX_FILE_ENCODE_BYTES) }); return }
   input.value = ''
   const reader = new FileReader()
   reader.onload = () => { const res = reader.result; if (typeof res !== 'string') return; fileBase64.value = res.split(',')[1] || ''; if (mode.value === 'decode') result.value = fileBase64.value }
@@ -191,21 +195,21 @@ onUnmounted(() => cleanupPreview())
 <template>
   <ToolPage name="base64" max-width="6xl" icon="i-lucide-binary">
     <div class="tool-workspace">
-      <ToolSection title="输入" description="选择编码或解码模式，支持文本和文件输入。">
+      <ToolSection :title="$t('app.input')" :description="$t('tools.base64.inputDesc')">
       <template #actions>
         <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
       </template>
       <div class="mb-4 flex items-center gap-3 flex-wrap justify-between">
         <div class="flex items-center gap-3 flex-wrap">
-          <UTabs v-model="mode" :items="[{ label: '编码', value: 'encode' }, { label: '解码', value: 'decode' }]" color="success" />
-          <UButton color="neutral" variant="ghost" @click="switchMode" class="rounded-full" icon="i-lucide-arrow-right-left" title="交换" />
+          <UTabs v-model="mode" :items="[{ label: $t('tools.base64.encode'), value: 'encode' }, { label: $t('tools.base64.decode'), value: 'decode' }]" color="success" />
+          <UButton color="neutral" variant="ghost" @click="switchMode" class="rounded-full" icon="i-lucide-arrow-right-left" :title="$t('app.swap')" />
           <UButton
             v-if="mode === 'encode'"
             color="neutral" variant="ghost"
             @click="triggerFile"
             class="rounded-full text-xs text-primary hover:bg-primary/10"
             icon="i-lucide-file-up"
-          >文件转 Base64</UButton>
+          >{{ $t('tools.base64.fileToBase64') }}</UButton>
           <input ref="fileInput" type="file" accept="*/*" class="hidden" @change="handleFileUpload" />
           <UButton
             v-if="mode === 'decode' && isImageResult"
@@ -213,8 +217,8 @@ onUnmounted(() => cleanupPreview())
             @click="downloadDecodedFile"
             class="rounded-full text-xs text-primary hover:bg-primary/10"
             icon="i-lucide-download"
-          >下载文件</UButton>
-          <UCheckbox v-if="mode === 'encode' && hasUploadedImageFile" v-model="addDataUri" label="Data URI 前缀" color="success" />
+          >{{ $t('tools.base64.downloadFile') }}</UButton>
+          <UCheckbox v-if="mode === 'encode' && hasUploadedImageFile" v-model="addDataUri" :label="$t('tools.base64.dataUriPrefix')" color="success" />
         </div>
       </div>
 
@@ -230,7 +234,7 @@ onUnmounted(() => cleanupPreview())
         v-if="!fileHandler.file.value"
         v-model="input"
         @blur="saveHistory"
-        :placeholder="mode === 'encode' ? '输入要编码的文本...' : '输入要解码的 Base64（支持大图片直接粘贴）'"
+        :placeholder="mode === 'encode' ? $t('tools.base64.encodePlaceholder') : $t('tools.base64.decodePlaceholder')"
         :rows="10"
         class="w-full"
       />
@@ -239,24 +243,24 @@ onUnmounted(() => cleanupPreview())
 
       <div v-if="showPreview" class="mt-4 space-y-2">
         <div class="flex items-center justify-between">
-          <span class="text-xs text-muted">图片预览</span>
-          <UButton color="neutral" variant="ghost" icon="i-lucide-download" @click="downloadImage" class="rounded-full text-xs">下载</UButton>
+          <span class="text-xs text-muted">{{ $t('tools.base64.imagePreview') }}</span>
+          <UButton color="neutral" variant="ghost" icon="i-lucide-download" @click="downloadImage" class="rounded-full text-xs">{{ $t('app.download') }}</UButton>
         </div>
         <div class="flex items-center justify-center rounded-xl bg-elevated p-4">
           <img :src="imgPreview" class="max-h-64 max-w-full rounded-lg object-contain" @error="onImgError" />
         </div>
       </div>
 
-        <ResultPanel v-if="finalResult" class="mt-4 lg:hidden" title="结果" :value="finalResult" pre-wrap compact max-height="260px">
+        <ResultPanel v-if="finalResult" class="mt-4 lg:hidden" :title="$t('app.result')" :value="finalResult" pre-wrap compact max-height="260px">
           {{ resultDisplay }}
         </ResultPanel>
       </ToolSection>
 
       <div class="hidden lg:block tool-preview-sticky">
-        <ResultPanel v-if="finalResult" title="结果" :value="finalResult" pre-wrap max-height="520px">
+        <ResultPanel v-if="finalResult" :title="$t('app.result')" :value="finalResult" pre-wrap max-height="520px">
           {{ resultDisplay }}
         </ResultPanel>
-        <ResultPanel v-else title="结果" value="" empty-text="等待输入..." />
+        <ResultPanel v-else :title="$t('app.result')" value="" :empty-text="$t('app.waitingForInput')" />
       </div>
     </div>
   </ToolPage>

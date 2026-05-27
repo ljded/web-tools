@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
@@ -7,10 +8,12 @@ import { usePersistedRef } from '@/utils/persist'
 
 const MAX_RANGE_ITEMS = 10000
 
+const { t } = useI18n()
+
 const sourceText = usePersistedRef('web-tools:picker:source', 'Apple\nBanana\nOrange\nGrape\nMango')
 const rangeText = usePersistedRef('web-tools:picker:range', '')
 const excludeText = usePersistedRef('web-tools:picker:exclude', '')
-const rewardText = usePersistedRef('web-tools:picker:rewards', '一等奖*1\n二等奖*2\n三等奖*3')
+const rewardText = usePersistedRef('web-tools:picker:rewards', t('tools.picker.rewardPlaceholder'))
 const pickCount = usePersistedRef('web-tools:picker:count', 1)
 const uniqueOnly = usePersistedRef('web-tools:picker:unique', true)
 const result = ref<string[]>([])
@@ -20,7 +23,7 @@ type ParsedEntries = { items: string[]; truncated: boolean }
 
 function parseOrderedLine(line: string) {
   return line
-    .replace(/^\s*(?:\d+|[A-Za-z]|[一二三四五六七八九十]+)[\.、\)）]\s*/, '')
+    .replace(/^\s*(?:\d+|[A-Za-z]|[\p{Script=Han}]+)[\.、\)）]\s*/u, '')
     .trim()
 }
 
@@ -167,16 +170,16 @@ function clearAll() {
       <div class="space-y-4">
         <ToolSection :title="$t('tools.picker.inputTitle')" :description="$t('tools.picker.inputDesc')">
           <div class="space-y-5">
-            <UFormField label="候选名单" description="每行或用逗号分隔一个候选，也可保留自然文本名单。">
+            <UFormField :label="$t('tools.picker.sourceLabel')" :description="$t('tools.picker.sourceDesc')">
               <UTextarea v-model="sourceText" :rows="7" :placeholder="$t('tools.picker.inputPlaceholder')" class="w-full" />
             </UFormField>
 
             <div class="tool-control-grid">
-              <UFormField label="区间候选" description="支持多个区间：1-5、10..20、30到25，可用逗号或换行分隔。">
-                <UTextarea v-model="rangeText" :rows="5" placeholder="1-5, 10-12\n30到25" class="w-full" />
+              <UFormField :label="$t('tools.picker.rangeLabel')" :description="$t('tools.picker.rangeDesc')">
+                <UTextarea v-model="rangeText" :rows="5" :placeholder="$t('tools.picker.rangePlaceholder')" class="w-full" />
               </UFormField>
-              <UFormField label="排除选项" description="可写具体值，也可写区间，例如 2-3、11。">
-                <UTextarea v-model="excludeText" :rows="5" placeholder="2-3, 11\nBanana" class="w-full" />
+              <UFormField :label="$t('tools.picker.excludeLabel')" :description="$t('tools.picker.excludeDesc')">
+                <UTextarea v-model="excludeText" :rows="5" :placeholder="$t('tools.picker.excludePlaceholder')" class="w-full" />
               </UFormField>
             </div>
 
@@ -185,15 +188,15 @@ function clearAll() {
               color="warning"
               variant="soft"
               icon="i-lucide-triangle-alert"
-              description="区间展开已达到 10000 项上限，超出的部分已忽略。"
+              :description="$t('tools.picker.rangeLimitNotice')"
             />
           </div>
         </ToolSection>
 
-        <ToolSection title="抽取规则" description="配置抽取数量、是否去重，以及按奖项批量抽取。">
+        <ToolSection :title="$t('tools.picker.ruleTitle')" :description="$t('tools.picker.ruleDesc')">
           <div class="space-y-5">
-            <UFormField label="奖励配置" description="每行一种奖励，格式如：一等奖*1、二等奖*2；留空则使用抽取数量。">
-              <UTextarea v-model="rewardText" :rows="4" placeholder="一等奖*1\n二等奖*2" class="w-full" />
+            <UFormField :label="$t('tools.picker.rewardLabel')" :description="$t('tools.picker.rewardDesc')">
+              <UTextarea v-model="rewardText" :rows="4" :placeholder="$t('tools.picker.rewardPlaceholder')" class="w-full" />
             </UFormField>
 
             <div class="tool-command-bar justify-between">
@@ -213,15 +216,15 @@ function clearAll() {
       </div>
 
       <div class="tool-preview-sticky space-y-4">
-        <ToolSection title="候选概览" compact>
+        <ToolSection :title="$t('tools.picker.overviewTitle')" compact>
           <div class="grid grid-cols-2 gap-3">
             <div class="tool-metric-card">
               <div class="text-2xl font-black text-highlighted">{{ candidates.length }}</div>
-              <div class="text-xs text-muted">可抽取候选</div>
+              <div class="text-xs text-muted">{{ $t('tools.picker.availableCandidates') }}</div>
             </div>
             <div class="tool-metric-card">
               <div class="text-2xl font-black text-highlighted">{{ excluded.size }}</div>
-              <div class="text-xs text-muted">已排除</div>
+              <div class="text-xs text-muted">{{ $t('tools.picker.excludedCount') }}</div>
             </div>
           </div>
         </ToolSection>

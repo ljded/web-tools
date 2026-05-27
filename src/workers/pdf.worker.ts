@@ -78,7 +78,7 @@ ctx.onmessage = async (event) => {
     if (payload.type === 'split') {
       const doc = await PDFDocument.load(payload.bytes)
       const groups = parseRanges(payload.ranges, doc.getPageCount())
-      if (!groups.length) throw new Error('页码范围格式错误')
+      if (!groups.length) throw new Error('__pdf_error:page_range')
 
       const files: Array<{ name: string; bytes: ArrayBuffer }> = []
       const transfers: Transferable[] = []
@@ -116,7 +116,7 @@ ctx.onmessage = async (event) => {
       return
     }
 
-    throw new Error('不支持的 PDF 命令')
+    throw new Error('__pdf_error:unsupported_command')
   } catch (error) {
     fail(id, error)
   }

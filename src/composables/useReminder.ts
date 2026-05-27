@@ -17,8 +17,18 @@ function getAudioContext() {
 export function useReminder() {
   const toast = useToast()
 
+  function requestSystemNotificationPermission() {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    if (Notification.permission !== 'default') return
+
+    try {
+      void Notification.requestPermission()
+    } catch {}
+  }
+
   async function primeAudio() {
     if (typeof window === 'undefined') return
+    requestSystemNotificationPermission()
     const ctx = getAudioContext()
     if (!ctx || ctx.state === 'running') return
     try {

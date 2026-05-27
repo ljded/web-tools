@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
 defineProps<{
   title: string
   description?: string
@@ -21,9 +25,9 @@ defineProps<{
         <div class="min-w-0">
           <div class="mb-3 flex flex-wrap items-center gap-2 text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-muted">
             <span class="h-1.5 w-1.5 rounded-full bg-primary shadow-sm shadow-primary" />
-            Tool Workbench
+            {{ t('app.toolWorkbench') }}
             <span class="hidden h-px w-8 bg-default sm:block" />
-            <span class="normal-case tracking-normal text-dimmed">Local-first utility</span>
+            <span class="normal-case tracking-normal text-dimmed">{{ t('app.localFirstUtility') }}</span>
           </div>
           <h1 class="text-balance text-3xl font-black tracking-tight text-highlighted sm:text-4xl">{{ title }}</h1>
           <p v-if="description" class="mt-3 max-w-3xl text-sm leading-6 text-muted sm:text-base">{{ description }}</p>

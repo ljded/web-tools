@@ -67,7 +67,7 @@ ctx.onmessage = (event) => {
 
     if (payload.type === 'file-chunk') {
       const session = sessions.get(payload.sessionId || '')
-      if (!session) throw new Error('未找到文件哈希会话')
+      if (!session) throw new Error('__hash_error:session_not_found')
       const bytes = new Uint8Array(payload.chunk)
       const wordArray = CryptoJS.lib.WordArray.create(bytes)
       session.md5.update(wordArray)
@@ -80,19 +80,19 @@ ctx.onmessage = (event) => {
 
     if (payload.type === 'file-finish') {
       const session = sessions.get(payload.sessionId || '')
-      if (!session) throw new Error('未找到文件哈希会话')
+      if (!session) throw new Error('__hash_error:session_not_found')
       sessions.delete(payload.sessionId || '')
       ok(id, {
         MD5: session.md5.finalize().toString(),
         SHA1: session.sha1.finalize().toString(),
         SHA256: session.sha256.finalize().toString(),
         SHA512: session.sha512.finalize().toString(),
-        SM3: 'SM3 不支持文件哈希',
+        SM3: '__hash_error:sm3_file_unsupported',
       })
       return
     }
 
-    throw new Error('不支持的哈希命令')
+    throw new Error('__hash_error:unsupported_command')
   } catch (error) {
     fail(id, error)
   }

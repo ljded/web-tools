@@ -42,7 +42,7 @@ ctx.onmessage = async (event) => {
           ok(id, CryptoJS.AES.encrypt(payload.text, payload.key).toString())
         } else {
           const bytes = CryptoJS.AES.decrypt(payload.text, payload.key)
-          ok(id, bytes.toString(CryptoJS.enc.Utf8) || '解密失败，请检查密钥和密文')
+          ok(id, bytes.toString(CryptoJS.enc.Utf8) || '__crypto_error:decrypt_failed')
         }
         return
       }
@@ -50,26 +50,26 @@ ctx.onmessage = async (event) => {
         const pubKey = payload.pubKey ?? payload.pub
         const priKey = payload.priKey ?? payload.pri
         if (payload.mode === 'encrypt') {
-          if (!pubKey) throw new Error('缺少公钥')
+          if (!pubKey) throw new Error('__crypto_error:missing_public_key')
           ok(id, sm2.doEncrypt(payload.text, pubKey, 1))
         } else if (payload.mode === 'decrypt') {
-          if (!priKey) throw new Error('缺少私钥')
-          ok(id, sm2.doDecrypt(payload.text, priKey, 1) || '解密失败')
+          if (!priKey) throw new Error('__crypto_error:missing_private_key')
+          ok(id, sm2.doDecrypt(payload.text, priKey, 1) || '__crypto_error:decrypt_failed')
         } else if (payload.mode === 'sign') {
-          if (!priKey) throw new Error('缺少私钥')
+          if (!priKey) throw new Error('__crypto_error:missing_private_key')
           ok(id, sm2.doSignature(payload.text, priKey))
         } else if (payload.mode === 'verify') {
-          if (!pubKey) throw new Error('缺少公钥')
+          if (!pubKey) throw new Error('__crypto_error:missing_public_key')
           const sig = payload.text.split('||')[1] || ''
           const msg = payload.text.split('||')[0] || ''
-          if (!sig || !msg) throw new Error('格式：消息||签名')
+          if (!sig || !msg) throw new Error('__crypto_error:signature_format')
           const valid = sm2.doVerifySignature(msg, sig, pubKey)
-          ok(id, valid ? '✅ 签名验证通过' : '❌ 签名验证失败')
+          ok(id, valid ? '__crypto_result:signature_verified' : '__crypto_result:signature_failed')
         }
         return
       }
       case 'rsa': {
-        throw new Error('RSA 请使用 rsa.worker 执行')
+        throw new Error('__crypto_error:rsa_worker_required')
       }
       case 'jwt-sign': {
         const secret = new TextEncoder().encode(payload.secret)
@@ -98,7 +98,7 @@ ctx.onmessage = async (event) => {
         return
       }
       case 'bcrypt-compare': {
-        ok(id, bcrypt.compareSync(payload.text, payload.hash) ? '密码匹配' : '密码不匹配')
+        ok(id, bcrypt.compareSync(payload.text, payload.hash))
         return
       }
       case 'bcrypt-verify': {
@@ -107,14 +107,14 @@ ctx.onmessage = async (event) => {
       }
       case 'sm4': {
         const keyBytes = new TextEncoder().encode(payload.key)
-        if (keyBytes.length !== 16) throw new Error('SM4 密钥必须是 16 字节文本')
+        if (keyBytes.length !== 16) throw new Error('__crypto_error:sm4_key_invalid')
         const keyHex = Array.from(keyBytes)
           .map((b) => b.toString(16).padStart(2, '0'))
           .join('')
         if (payload.mode === 'encrypt') {
           ok(id, sm4.encrypt(payload.text, keyHex, { mode: 'ecb', padding: 'pkcs#7' }))
         } else {
-          ok(id, sm4.decrypt(payload.text.trim(), keyHex, { mode: 'ecb', padding: 'pkcs#7' }) || '解密失败，请检查密文或密钥')
+          ok(id, sm4.decrypt(payload.text.trim(), keyHex, { mode: 'ecb', padding: 'pkcs#7' }) || '__crypto_error:decrypt_failed')
         }
         return
       }
@@ -124,7 +124,7 @@ ctx.onmessage = async (event) => {
         return
       }
       default:
-        throw new Error('不支持的加密命令')
+        throw new Error('__crypto_error:unsupported_command')
     }
   } catch (error) {
     fail(id, error)

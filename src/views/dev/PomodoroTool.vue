@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import ResultPanel from '@/components/ResultPanel.vue'
 import { useReminder } from '@/composables/useReminder'
 import ToolPage from '@/components/tool/ToolPage.vue'
@@ -7,6 +8,8 @@ import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
 
 type Phase = 'work' | 'break'
+
+const { t } = useI18n()
 
 const workMinutes = usePersistedRef('web-tools:pomodoro:work-minutes', 25)
 const breakMinutes = usePersistedRef('web-tools:pomodoro:break-minutes', 5)
@@ -47,8 +50,8 @@ function resetPhaseSeconds() {
 
 function remindPhaseEnd(completedPhase: Phase) {
   notify({
-    title: completedPhase === 'work' ? '专注结束' : '休息结束',
-    description: completedPhase === 'work' ? '可以休息一下了。' : '开始下一轮专注吧。',
+    title: completedPhase === 'work' ? t('tools.pomodoro.workDoneTitle') : t('tools.pomodoro.breakDoneTitle'),
+    description: completedPhase === 'work' ? t('tools.pomodoro.workDoneDesc') : t('tools.pomodoro.breakDoneDesc'),
     color: completedPhase === 'work' ? 'success' : 'primary',
     icon: completedPhase === 'work' ? 'i-lucide-coffee' : 'i-lucide-timer-reset',
   })
@@ -144,6 +147,8 @@ function handleVisibilityChange() {
   if (!document.hidden) reconcileTime()
 }
 
+const sessionStatusText = computed(() => (running.value ? t('tools.pomodoro.running') : t('tools.pomodoro.paused')))
+
 onMounted(() => {
   document.addEventListener('visibilitychange', handleVisibilityChange)
   if (running.value) startTick()
@@ -159,7 +164,7 @@ onUnmounted(() => {
   <ToolPage name="pomodoro" max-width="6xl" icon="i-lucide-timer-reset">
     <div class="tool-workspace">
       <div class="space-y-4">
-        <ToolSection :title="$t('tools.pomodoro.config')" description="设置专注与休息时长，阶段状态和提醒信息始终在右侧可见。">
+        <ToolSection :title="$t('tools.pomodoro.config')" :description="$t('tools.pomodoro.configDesc')">
           <div class="space-y-5">
             <div class="tool-control-grid">
               <UFormField :label="$t('tools.pomodoro.workMinutes')">
@@ -169,7 +174,7 @@ onUnmounted(() => {
                 <UInput :model-value="breakMinutes" type="number" :min="1" :max="60" class="w-full" @update:model-value="applyBreakMinutes(Number($event))" />
               </UFormField>
             </div>
-            <UAlert color="primary" variant="soft" icon="i-lucide-info" description="后台运行时会按真实时间切换阶段，阶段结束会弹出提示并播放提醒音。" />
+            <UAlert color="primary" variant="soft" icon="i-lucide-info" :description="$t('tools.pomodoro.backgroundNotice')" />
           </div>
         </ToolSection>
 
@@ -184,7 +189,7 @@ onUnmounted(() => {
                 {{ phase === 'work' ? $t('tools.pomodoro.workPhase') : $t('tools.pomodoro.breakPhase') }}
               </UBadge>
               <UBadge :color="running ? 'primary' : 'neutral'" variant="soft" class="rounded-full">
-                {{ running ? '进行中' : '已暂停' }}
+                {{ sessionStatusText }}
               </UBadge>
             </div>
             <div class="mt-4 text-6xl font-black tracking-widest text-highlighted sm:text-7xl">{{ displayTime }}</div>
@@ -200,7 +205,7 @@ onUnmounted(() => {
                 {{ $t('tools.pomodoro.reset') }}
               </UButton>
               <UButton color="neutral" variant="ghost" icon="i-lucide-maximize-2" class="rounded-full" @click="fullscreen = true">
-                全屏
+                {{ $t('tools.pomodoro.fullscreen') }}
               </UButton>
             </div>
           </div>
@@ -209,13 +214,13 @@ onUnmounted(() => {
     </div>
 
     <div v-if="fullscreen" class="tool-fullscreen-stage fixed inset-0 z-50 flex flex-col items-center justify-center p-6">
-      <UButton color="neutral" variant="ghost" icon="i-lucide-minimize-2" class="absolute right-6 top-6 rounded-full" @click="fullscreen = false">退出全屏</UButton>
+      <UButton color="neutral" variant="ghost" icon="i-lucide-minimize-2" class="absolute right-6 top-6 rounded-full" @click="fullscreen = false">{{ $t('tools.pomodoro.exitFullscreen') }}</UButton>
       <div class="flex flex-wrap items-center justify-center gap-2">
         <UBadge :color="phase === 'work' ? 'primary' : 'success'" variant="soft" size="lg" class="rounded-full">
           {{ phase === 'work' ? $t('tools.pomodoro.workPhase') : $t('tools.pomodoro.breakPhase') }}
         </UBadge>
         <UBadge :color="running ? 'primary' : 'neutral'" variant="soft" size="lg" class="rounded-full">
-          {{ running ? '进行中' : '已暂停' }}
+          {{ sessionStatusText }}
         </UBadge>
       </div>
       <div class="mt-8 text-[18vw] font-black leading-none tracking-widest text-highlighted">{{ displayTime }}</div>

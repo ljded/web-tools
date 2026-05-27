@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useToolState } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import FileDropZone from '@/components/FileDropZone.vue'
@@ -7,12 +8,28 @@ import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
+import { useRouteQueryValue } from '@/utils/routeQuery'
+
+const { t } = useI18n()
 
 const activeTab = usePersistedRef<'generate' | 'parse'>('web-tools:qrcode:tab', 'generate')
+useRouteQueryValue('tab', activeTab, ['generate', 'parse'])
+
+const tabItems = computed(() => [
+  { label: t('tools.qrcode.generate'), value: 'generate', icon: 'i-lucide-qr-code' },
+  { label: t('tools.qrcode.parse'), value: 'parse', icon: 'i-lucide-scan-line' },
+])
+
+const errorCorrectionItems = computed(() => [
+  { label: t('tools.qrcode.ecl.low'), value: 'L' },
+  { label: t('tools.qrcode.ecl.medium'), value: 'M' },
+  { label: t('tools.qrcode.ecl.quartile'), value: 'Q' },
+  { label: t('tools.qrcode.ecl.high'), value: 'H' },
+])
 
 const { input: text, history: genHistory, saveHistory: saveGenHistory } = useToolState<string, { text: string }>({
   storageKey: 'qrcode:gen',
-  defaultInput: 'Web Tools - 本地离线工具集',
+  defaultInput: t('tools.qrcode.defaultText'),
   getHistoryData: (value) => ({ text: value }),
   historyOptions: {
     maxCount: 10,
@@ -45,9 +62,9 @@ let generateTimer: ReturnType<typeof setTimeout> | null = null
 let generateSeq = 0
 
 const generateMeta = computed(() => [
-  { label: '字符', value: text.value.length },
-  { label: '尺寸', value: `${size.value}px` },
-  { label: '纠错', value: errorCorrectionLevel.value },
+  { label: t('tools.qrcode.metaChars'), value: text.value.length },
+  { label: t('tools.qrcode.size'), value: `${size.value}px` },
+  { label: t('tools.qrcode.errorCorrection'), value: errorCorrectionLevel.value },
 ])
 
 async function generate() {
@@ -69,7 +86,7 @@ async function generate() {
     })
   } catch (e: any) {
     if (seq !== generateSeq) return
-    genError.value = e.message || '生成失败'
+    genError.value = e.message || t('tools.qrcode.generateFailed')
   } finally {
     if (seq === generateSeq) genLoading.value = false
   }
@@ -114,7 +131,7 @@ async function downloadSvg() {
   URL.revokeObjectURL(url)
 }
 
-// 解析
+// Parse
 const parseResult = ref('')
 const parseError = ref('')
 const parseLoading = ref(false)
@@ -127,10 +144,10 @@ async function decodeFromImageData(imageData: ImageData) {
     const { default: jsQR } = await import('jsqr')
     const code = jsQR(imageData.data, imageData.width, imageData.height)
     if (code) { parseResult.value = code.data; parseError.value = '' }
-    else { parseResult.value = ''; parseError.value = '未识别到二维码，请尝试更换图片或调整裁剪区域' }
+    else { parseResult.value = ''; parseError.value = t('tools.qrcode.parseError') }
   } catch (e: any) {
     parseResult.value = ''
-    parseError.value = e.message || '解析失败'
+    parseError.value = e.message || t('tools.qrcode.parseFailed')
   } finally {
     parseLoading.value = false
   }
@@ -154,7 +171,7 @@ function parseImageFile(file: File) {
   }
   reader.onerror = () => {
     parseLoading.value = false
-    parseError.value = '图片读取失败'
+    parseError.value = t('tools.qrcode.imageReadFailed')
   }
   reader.readAsDataURL(file)
 }
@@ -166,11 +183,11 @@ function decodeImageSource(src: string) {
     const canvas = document.createElement('canvas')
     canvas.width = img.width; canvas.height = img.height
     const ctx = canvas.getContext('2d')
-    if (!ctx) { parseLoading.value = false; parseError.value = '当前浏览器无法读取图片内容'; return }
+    if (!ctx) { parseLoading.value = false; parseError.value = t('tools.qrcode.imageReadUnsupported'); return }
     ctx.drawImage(img, 0, 0)
     await decodeFromImageData(ctx.getImageData(0, 0, canvas.width, canvas.height))
   }
-  img.onerror = () => { parseLoading.value = false; parseError.value = '无法加载图片，请检查输入内容或尝试上传文件' }
+  img.onerror = () => { parseLoading.value = false; parseError.value = t('tools.qrcode.imageLoadErrorUrl') }
   img.src = src
 }
 
@@ -189,49 +206,38 @@ function parseFromInput() {
 <template>
   <ToolPage name="qrcode" max-width="6xl">
     <div class="space-y-4">
-      <UTabs
-        v-model="activeTab"
-        :items="[
-          { label: '生成二维码', value: 'generate', icon: 'i-lucide-qr-code' },
-          { label: '解析二维码', value: 'parse', icon: 'i-lucide-scan-line' }
-        ]"
-      />
+      <UTabs v-model="activeTab" :items="tabItems" />
 
       <div v-if="activeTab === 'generate'" class="tool-workspace">
-        <ToolSection title="生成二维码" description="输入文本并调整尺寸、留白、纠错等级和颜色。">
+        <ToolSection :title="$t('tools.qrcode.generate')" :description="$t('tools.qrcode.generateDesc')">
           <template #actions>
             <HistoryPanel :items="genHistory.items.value" @select="onGenHistorySelect" @remove="genHistory.remove" @clear="genHistory.clear" />
           </template>
 
           <div class="space-y-5">
-            <UFormField label="内容">
-              <UTextarea v-model="text" @blur="saveGenHistory" placeholder="输入网址或文本..." :rows="7" class="w-full" />
+            <UFormField :label="$t('tools.qrcode.content')">
+              <UTextarea v-model="text" @blur="saveGenHistory" :placeholder="$t('tools.qrcode.contentPlaceholder')" :rows="7" class="w-full" />
             </UFormField>
 
             <div class="hig-subtle-surface grid gap-4 rounded-2xl border p-4 sm:grid-cols-2">
-              <UFormField :label="`尺寸: ${size}px`">
+              <UFormField :label="`${$t('tools.qrcode.size')}: ${size}px`">
                 <USlider v-model="size" :min="64" :max="1024" :step="16" />
               </UFormField>
-              <UFormField :label="`留白: ${margin}`">
+              <UFormField :label="`${$t('tools.qrcode.margin')}: ${margin}`">
                 <USlider v-model="margin" :min="0" :max="8" :step="1" />
               </UFormField>
-              <UFormField label="纠错等级">
+              <UFormField :label="$t('tools.qrcode.errorCorrection')">
                 <USelect
                   v-model="errorCorrectionLevel"
-                  :items="[
-                    { label: '低 L', value: 'L' },
-                    { label: '中 M', value: 'M' },
-                    { label: '较高 Q', value: 'Q' },
-                    { label: '高 H', value: 'H' }
-                  ]"
+                  :items="errorCorrectionItems"
                   class="w-full"
                 />
               </UFormField>
               <div class="grid grid-cols-2 gap-3">
-                <UFormField label="前景">
+                <UFormField :label="$t('tools.qrcode.fgColor')">
                   <UColorPicker v-model="fgColor" format="hex" size="sm" />
                 </UFormField>
-                <UFormField label="背景">
+                <UFormField :label="$t('tools.qrcode.bgColor')">
                   <UColorPicker v-model="bgColor" format="hex" size="sm" />
                 </UFormField>
               </div>
@@ -242,7 +248,7 @@ function parseFromInput() {
         </ToolSection>
 
         <ResultPanel
-          title="二维码预览"
+          :title="$t('tools.qrcode.previewTitle')"
           :value="text"
           :meta="generateMeta"
           :copyable="false"
@@ -254,32 +260,32 @@ function parseFromInput() {
               <canvas ref="canvasRef" class="max-w-full" />
             </div>
             <div class="flex flex-wrap justify-center gap-2">
-              <UButton color="primary" icon="i-lucide-download" class="rounded-full" :disabled="!text || genLoading" @click="downloadPng">下载 PNG</UButton>
-              <UButton color="neutral" variant="soft" icon="i-lucide-file-code" class="rounded-full" :disabled="!text || genLoading" @click="downloadSvg">下载 SVG</UButton>
+              <UButton color="primary" icon="i-lucide-download" class="rounded-full" :disabled="!text || genLoading" @click="downloadPng">{{ $t('tools.qrcode.downloadPng') }}</UButton>
+              <UButton color="neutral" variant="soft" icon="i-lucide-file-code" class="rounded-full" :disabled="!text || genLoading" @click="downloadSvg">{{ $t('tools.qrcode.downloadSvg') }}</UButton>
             </div>
           </div>
         </ResultPanel>
       </div>
 
       <div v-if="activeTab === 'parse'" class="tool-workspace">
-        <ToolSection title="解析二维码" description="上传图片或粘贴 Base64 / Data URL，在本地识别二维码内容。">
+        <ToolSection :title="$t('tools.qrcode.parse')" :description="$t('tools.qrcode.parseDesc')">
           <template #actions>
             <HistoryPanel :items="parseHistory.items.value" @select="onParseHistorySelect" @remove="parseHistory.remove" @clear="parseHistory.clear" />
           </template>
 
           <div class="space-y-5">
-            <UFormField label="图片 Base64 / Data URL">
-              <UTextarea v-model="parseInput" @blur="saveParseHistory" placeholder="粘贴图片 Base64 或 Data URL..." :rows="6" class="w-full" />
+            <UFormField :label="$t('tools.qrcode.parseInputLabel')">
+              <UTextarea v-model="parseInput" @blur="saveParseHistory" :placeholder="$t('tools.qrcode.parsePlaceholder')" :rows="6" class="w-full" />
             </UFormField>
 
             <div class="flex flex-wrap gap-2">
-              <UButton color="primary" icon="i-lucide-scan-line" class="rounded-full" :loading="parseLoading" :disabled="!parseInput.trim()" @click="parseFromInput">解析输入</UButton>
+              <UButton color="primary" icon="i-lucide-scan-line" class="rounded-full" :loading="parseLoading" :disabled="!parseInput.trim()" @click="parseFromInput">{{ $t('tools.qrcode.parseInputBtn') }}</UButton>
             </div>
 
             <FileDropZone
               accept="image/*"
-              title="上传或拖拽二维码图片"
-              hint="支持 PNG、JPG、WEBP 等常见图片格式"
+              :title="$t('tools.qrcode.uploadTitle')"
+              :hint="$t('tools.qrcode.uploadHint')"
               @files="handleParseFiles"
             />
 
@@ -289,14 +295,14 @@ function parseFromInput() {
 
         <div class="space-y-3 tool-preview-sticky">
           <div class="hig-panel rounded-[1.75rem] border p-4">
-            <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">图片预览</div>
+            <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-muted">{{ $t('tools.qrcode.imagePreview') }}</div>
             <div class="flex min-h-56 items-center justify-center rounded-2xl bg-elevated p-4">
-              <img v-if="previewSrc" :src="previewSrc" alt="二维码预览" class="max-h-72 max-w-full rounded-xl object-contain" />
-              <div v-else class="text-sm text-muted">上传或粘贴图片后显示预览</div>
+              <img v-if="previewSrc" :src="previewSrc" :alt="$t('tools.qrcode.previewAlt')" class="max-h-72 max-w-full rounded-xl object-contain" />
+              <div v-else class="text-sm text-muted">{{ $t('tools.qrcode.previewEmpty') }}</div>
             </div>
           </div>
 
-          <ResultPanel title="解析结果" :value="parseResult" :error="parseError" :loading="parseLoading" empty-text="等待解析二维码..." pre-wrap />
+          <ResultPanel :title="$t('tools.qrcode.parseResult')" :value="parseResult" :error="parseError" :loading="parseLoading" :empty-text="$t('tools.qrcode.emptyParseResult')" pre-wrap />
         </div>
       </div>
     </div>

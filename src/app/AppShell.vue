@@ -39,6 +39,9 @@ defineShortcuts({
   meta_k: () => {
     searchOpen.value = true
   },
+  ctrl_k: () => {
+    searchOpen.value = true
+  },
 })
 </script>
 

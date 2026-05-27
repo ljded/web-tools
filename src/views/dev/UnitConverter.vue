@@ -3,11 +3,13 @@ import { computed, ref } from 'vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
+import { useRouteQueryValue } from '@/utils/routeQuery'
 
 type Category = 'length' | 'weight' | 'temperature'
 type UnitValue = 'mm' | 'cm' | 'm' | 'km' | 'in' | 'ft' | 'mg' | 'g' | 'kg' | 'lb' | 'c' | 'f' | 'k'
 
 const category = ref<Category>('length')
+useRouteQueryValue('category', category, ['length', 'weight', 'temperature'])
 const inputValue = ref('1')
 const fromUnit = ref<UnitValue>('m')
 const toUnit = ref<UnitValue>('cm')

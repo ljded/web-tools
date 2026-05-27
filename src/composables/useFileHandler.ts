@@ -21,7 +21,7 @@ export function useFileHandler(options: FileHandlerOptions = {}): FileHandler {
   function setFile(f: File): boolean {
     error.value = ''
     if (maxSize && f.size > maxSize) {
-      error.value = `文件超过 ${formatSize(maxSize)}，无法处理`
+      error.value = '__file_error:too_large'
       return false
     }
     file.value = f

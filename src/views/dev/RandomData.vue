@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import CopyBtn from '@/components/CopyBtn.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
+
+const { t, locale } = useI18n()
 
 function randomInt(min: number, max: number) { return Math.floor(Math.random() * (max - min + 1)) + min }
 
@@ -44,36 +47,46 @@ async function genName(): Promise<string> { const mod = await import('@faker-js/
 async function genAddress(): Promise<string> { const mod = await import('@faker-js/faker'); const f = (mod as any).fakerZH_CN || mod.faker; return f.location.city() + f.location.streetAddress() }
 async function genCompany(): Promise<string> { const mod = await import('@faker-js/faker'); const f = (mod as any).fakerZH_CN || mod.faker; return f.company.name() }
 
-interface Generator { key: string; label: string; gen: () => string | Promise<string> }
-const generators: Generator[] = [
-  { key: 'phone', label: '手机号', gen: genPhone },
-  { key: 'idcard', label: '身份证号', gen: genIdCard },
-  { key: 'email', label: '邮箱', gen: genEmail },
-  { key: 'bank', label: '银行卡号', gen: genBankCard },
-  { key: 'uuid', label: 'UUID', gen: genUUID },
-  { key: 'ip', label: 'IPv4', gen: genIP },
-  { key: 'mac', label: 'MAC 地址', gen: genMAC },
-  { key: 'password', label: '随机密码', gen: () => genPassword(16) },
-  { key: 'name', label: '姓名', gen: genName },
-  { key: 'address', label: '地址', gen: genAddress },
-  { key: 'company', label: '公司名', gen: genCompany },
-  { key: 'string', label: '随机字符串', gen: genRandomString },
+interface GeneratorConfig { key: string; gen: () => string | Promise<string> }
+const generatorConfigs: GeneratorConfig[] = [
+  { key: 'phone', gen: genPhone },
+  { key: 'idcard', gen: genIdCard },
+  { key: 'email', gen: genEmail },
+  { key: 'bank', gen: genBankCard },
+  { key: 'uuid', gen: genUUID },
+  { key: 'ip', gen: genIP },
+  { key: 'mac', gen: genMAC },
+  { key: 'password', gen: () => genPassword(16) },
+  { key: 'name', gen: genName },
+  { key: 'address', gen: genAddress },
+  { key: 'company', gen: genCompany },
+  { key: 'string', gen: genRandomString },
 ]
 
+const generators = computed(() => {
+  locale.value
+  return generatorConfigs.map((generator) => ({
+    ...generator,
+    label: t(`tools.random.generators.${generator.key}`),
+  }))
+})
+
 const results = ref<Record<string, string>>({})
+const failed = ref<Record<string, boolean>>({})
 const loading = ref<Record<string, boolean>>({})
 
 async function generate(key: string) {
-  const g = generators.find((x) => x.key === key)
+  const g = generatorConfigs.find((x) => x.key === key)
   if (!g) return
   loading.value[key] = true
+  failed.value[key] = false
   try { const val = await g.gen(); results.value[key] = val }
-  catch { results.value[key] = '生成失败' }
+  catch { results.value[key] = t('tools.random.generateFailed'); failed.value[key] = true }
   finally { loading.value[key] = false }
 }
 
 function generateAll() {
-  generators.forEach((g) => generate(g.key))
+  generatorConfigs.forEach((g) => generate(g.key))
 }
 </script>
 
@@ -81,11 +94,11 @@ function generateAll() {
   <ToolPage name="random" max-width="6xl" icon="i-lucide-dices">
     <template #actions>
       <UButton color="primary" variant="soft" icon="i-lucide-refresh-cw" class="rounded-full" @click="generateAll">
-        全部生成
+        {{ $t('tools.random.generateAll') }}
       </UButton>
     </template>
 
-    <ToolSection title="随机数据工作台" description="常用测试数据集中生成，单项刷新后可直接复制。" compact>
+    <ToolSection :title="$t('tools.random.workbenchTitle')" :description="$t('tools.random.workbenchDesc')" compact>
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <div v-for="g in generators" :key="g.key" class="tool-list-item p-4">
           <div class="mb-3 flex items-center justify-between gap-3">
@@ -97,8 +110,8 @@ function generateAll() {
               color="neutral"
               variant="ghost"
               icon="i-lucide-refresh-cw"
-              :aria-label="`生成${g.label}`"
-              :title="`生成${g.label}`"
+              :aria-label="$t('tools.random.generateOne', { label: g.label })"
+              :title="$t('tools.random.generateOne', { label: g.label })"
               @click="generate(g.key)"
               :disabled="loading[g.key]"
               class="rounded-full"
@@ -110,7 +123,7 @@ function generateAll() {
             <div class="min-w-0 flex-1 truncate rounded-2xl bg-elevated/55 px-3 py-2 font-mono text-sm text-default shadow-inner shadow-default/5">
               {{ results[g.key] || '-' }}
             </div>
-            <CopyBtn v-if="results[g.key] && results[g.key] !== '生成失败'" :text="results[g.key]!" />
+            <CopyBtn v-if="results[g.key] && !failed[g.key]" :text="results[g.key]!" />
           </div>
         </div>
       </div>
