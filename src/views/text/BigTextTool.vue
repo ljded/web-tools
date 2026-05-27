@@ -4,10 +4,12 @@ import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
+import { useRouteQueryValue } from '@/utils/routeQuery'
 
 type Mode = 'stats' | 'dedupe' | 'sort' | 'chunk'
 
 const mode = usePersistedRef<Mode>('web-tools:bigtext:mode', 'stats')
+useRouteQueryValue('mode', mode, ['stats', 'dedupe', 'sort', 'chunk'])
 const input = usePersistedRef('web-tools:bigtext:input', 'line-1\nline-2\nline-1\nline-3')
 const chunkSize = usePersistedRef('web-tools:bigtext:chunk-size', 1000)
 const chunkIndex = ref(0)

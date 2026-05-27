@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useToolState } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import CopyBtn from '@/components/CopyBtn.vue'
@@ -7,6 +8,8 @@ import JsonTree from '@/components/JsonTree.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
+
+const { t } = useI18n()
 
 const { input, history, saveHistory } = useToolState<string, { input: string }>({
   storageKey: 'json',
@@ -42,13 +45,13 @@ function formatJson() {
 function compressJson() {
   if (!input.value.trim()) return
   try { const obj = JSON.parse(input.value); input.value = JSON.stringify(obj); error.value = '' }
-  catch (e: any) { error.value = e.message || 'JSON 格式错误' }
+  catch (e: any) { error.value = e.message || t('tools.json.jsonFormatError') }
 }
 
 function escapeJson() {
   if (!input.value.trim()) return
   try { const obj = JSON.parse(input.value); input.value = JSON.stringify(JSON.stringify(obj)); error.value = '' }
-  catch (e: any) { error.value = e.message || 'JSON 格式错误' }
+  catch (e: any) { error.value = e.message || t('tools.json.jsonFormatError') }
 }
 
 function base64UrlDecode(value: string): unknown {
@@ -79,11 +82,11 @@ function extractJwt(): string {
 function parseJwt() {
   const token = extractJwt()
   const parts = token.split('.')
-  if (parts.length !== 3) { error.value = '未找到有效 JWT'; return }
+  if (parts.length !== 3) { error.value = t('tools.json.jwtError'); return }
   try {
     input.value = JSON.stringify({ header: base64UrlDecode(parts[0]!), payload: base64UrlDecode(parts[1]!), signature: parts[2], raw: token }, null, 2)
     error.value = ''
-  } catch (e: any) { error.value = e.message || 'JWT 解析失败' }
+  } catch (e: any) { error.value = e.message || t('tools.json.jwtParseError') }
 }
 
 function openFind() {
@@ -96,8 +99,8 @@ function validateJson() {
   if (validateTimer) clearTimeout(validateTimer)
   validateTimer = setTimeout(() => {
     if (!input.value.trim()) { error.value = ''; parsed.value = null; status.value = ''; return }
-    try { const obj = JSON.parse(input.value); parsed.value = obj; status.value = 'JSON 有效'; error.value = '' }
-    catch (e: any) { error.value = e.message || 'JSON 格式错误'; parsed.value = null; status.value = '' }
+    try { const obj = JSON.parse(input.value); parsed.value = obj; status.value = t('tools.json.validJson'); error.value = '' }
+    catch (e: any) { error.value = e.message || t('tools.json.jsonFormatError'); parsed.value = null; status.value = '' }
   }, 200)
 }
 
@@ -110,22 +113,22 @@ watch(input, validateJson, { immediate: true })
       <div class="tool-command-bar justify-between">
         <div class="flex flex-wrap items-center gap-2">
           <UBadge :color="error ? 'error' : status ? 'success' : 'neutral'" variant="soft" size="sm" class="rounded-full">
-            {{ error ? '格式错误' : status || '等待输入' }}
+            {{ error ? $t('tools.json.formatError') : status || $t('tools.json.waitingInput') }}
           </UBadge>
           <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-search" class="rounded-full" @click="openFind">搜索</UButton>
-          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-align-left" class="rounded-full" @click="formatJson">格式化</UButton>
-          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-minimize-2" class="rounded-full" @click="compressJson">压缩</UButton>
-          <UButton color="neutral" variant="soft" size="sm" class="rounded-full" @click="escapeJson">转义</UButton>
-          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-key-round" class="rounded-full" @click="parseJwt">解析 JWT</UButton>
+          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-search" class="rounded-full" @click="openFind">{{ $t('app.search') }}</UButton>
+          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-align-left" class="rounded-full" @click="formatJson">{{ $t('app.format') }}</UButton>
+          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-minimize-2" class="rounded-full" @click="compressJson">{{ $t('app.compress') }}</UButton>
+          <UButton color="neutral" variant="soft" size="sm" class="rounded-full" @click="escapeJson">{{ $t('tools.json.escape') }}</UButton>
+          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-key-round" class="rounded-full" @click="parseJwt">{{ $t('tools.json.parseJwt') }}</UButton>
           <CopyBtn :text="input" variant="button" />
           <UButton
             color="primary"
             variant="soft"
             size="sm"
-            :label="showTree ? '隐藏树视图' : '显示树视图'"
+            :label="showTree ? $t('tools.json.hideTree') : $t('tools.json.showTree')"
             :icon="showTree ? 'i-lucide-panel-right-close' : 'i-lucide-panel-right-open'"
             class="rounded-full"
             @click="toggleTree"
@@ -135,7 +138,7 @@ watch(input, validateJson, { immediate: true })
     </ToolSection>
 
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.78fr)]">
-      <ToolSection title="JSON 编辑器" description="格式化、压缩、转义或解析 JWT，校验状态会实时更新。" :padding="false">
+      <ToolSection :title="$t('tools.json.editorLabel')" :description="$t('tools.json.editorDesc')" :padding="false">
         <div class="h-[calc(100vh-16rem)] min-h-[560px] overflow-hidden rounded-b-[1.75rem]">
           <MonacoEditor ref="monacoRef" v-model="input" language="json" :options="{ wordWrap: 'on', find: { addExtraSpaceOnTop: true, autoFindInSelection: 'never' } }" @blur="saveHistory" />
         </div>
@@ -147,11 +150,11 @@ watch(input, validateJson, { immediate: true })
       </ToolSection>
 
       <div v-show="showTree" class="tool-preview-sticky">
-        <ToolSection title="结构预览" description="在桌面端固定显示，移动端会排在编辑器下方。">
+        <ToolSection :title="$t('tools.json.structurePreview')" :description="$t('tools.json.structurePreviewDesc')">
           <div class="hig-subtle-surface max-h-[640px] overflow-auto rounded-[1.35rem] border p-3">
             <JsonTree v-if="parsed !== null" :data="parsed" />
-            <UAlert v-else-if="input.trim()" :color="error ? 'error' : 'success'" variant="soft" :icon="error ? 'i-lucide-circle-alert' : 'i-lucide-circle-check'" :description="error || status || '无法解析为 JSON'" />
-            <div v-else class="px-2 py-4 text-sm text-muted">输入 JSON 以查看树形结构</div>
+            <UAlert v-else-if="input.trim()" :color="error ? 'error' : 'success'" variant="soft" :icon="error ? 'i-lucide-circle-alert' : 'i-lucide-circle-check'" :description="error || status || $t('tools.json.invalidJson')" />
+            <div v-else class="px-2 py-4 text-sm text-muted">{{ $t('tools.json.treePlaceholder') }}</div>
           </div>
         </ToolSection>
       </div>

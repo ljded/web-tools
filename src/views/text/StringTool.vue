@@ -5,6 +5,7 @@ import HistoryPanel from '@/components/HistoryPanel.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
+import { useRouteQueryValue } from '@/utils/routeQuery'
 
 const { input, history, saveHistory } = useToolState<string, { input: string }>({
   storageKey: 'string-tool',
@@ -17,6 +18,7 @@ const { input, history, saveHistory } = useToolState<string, { input: string }>(
 })
 
 const selectedResultKey = ref('camel')
+useRouteQueryValue('result', selectedResultKey, ['upper', 'lower', 'title', 'camel', 'pascal', 'snake', 'kebab', 'trimmed', 'collapsed', 'uniqueLines', 'sortedLines', 'reversedLines'])
 
 function onHistorySelect(item: { data: { input: string } }) {
   input.value = item.data.input

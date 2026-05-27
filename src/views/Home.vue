@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { domainI18nKeys, offlineTools as registryOfflineTools, tools, toolsByName, workerTools, type ToolDomain } from '@/tools/registry'
+import { domainI18nKeys, offlineTools as registryOfflineTools, toolsByName, type ToolDomain } from '@/tools/registry'
 import { getPreloadedToolNames, getPreloadedToolsStorageStatus, preloadToolByName, preloadToolByNameNow, preloadToolsByNamesInBackground } from '@/tools/preload'
 import { searchTools } from '@/tools/search'
 import { usePersistedRef } from '@/utils/persist'
@@ -10,6 +10,7 @@ import { usePersistedRef } from '@/utils/persist'
 const FAVORITE_TOOLS_KEY = 'web-tools:favorite-tools'
 const RECENT_TOOLS_KEY = 'web-tools:recent-tools'
 const OFFLINE_DOWNLOAD_SELECTION_KEY = 'web-tools:offline-download-selection'
+const searchInputId = 'home-tool-search'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -31,8 +32,10 @@ const toolCards = computed(() =>
     favoriteNames: favoriteTools.value,
     recentNames: recentTools.value,
     preferredCapabilities: ['offline'],
-  }).map(({ tool, label, description }) => ({
+  }).map(({ tool, label, description, path, feature }) => ({
     ...tool,
+    path,
+    feature,
     label,
     desc: description,
   })),
@@ -77,7 +80,7 @@ const suggestedOfflineToolNames = computed(() => [...new Set([...favoriteTools.v
 
 const favoriteCards = computed(() =>
   favoriteTools.value
-    .map((name) => toolCards.value.find((tool) => tool.name === name) ?? toolsByName.get(name))
+    .map((name) => toolsByName.get(name))
     .filter((tool): tool is NonNullable<typeof tool> => Boolean(tool))
     .map((tool) => ({
       ...tool,
@@ -98,13 +101,39 @@ const recentCards = computed(() =>
     })),
 )
 
-const stats = computed(() => [
-  { label: t('app.stats.tools'), value: tools.length, icon: 'i-lucide-layout-grid' },
-  { label: t('app.stats.offline'), value: offlineTools.value.length, icon: 'i-lucide-wifi-off' },
-  { label: t('app.stats.workers'), value: workerTools.length, icon: 'i-lucide-cpu' },
-])
 
 function go(path: string) { router.push(path) }
+
+function focusSearch() {
+  const input = document.getElementById(searchInputId) as HTMLInputElement | null
+  input?.focus({ preventScroll: true })
+  input?.select()
+}
+
+function handlePageKeydown(event: KeyboardEvent) {
+  if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
+  const target = event.target as HTMLElement | null
+  if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+  event.preventDefault()
+  focusSearch()
+}
+
+function handleToolCardKeydown(event: KeyboardEvent, path: string) {
+  if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return
+  event.preventDefault()
+  go(path)
+}
+
+function openFirstSearchResult(event: KeyboardEvent) {
+  const firstTool = toolCards.value[0]
+  if (!firstTool) return
+  event.preventDefault()
+  go(firstTool.path)
+}
+
+function clearSearch() {
+  search.value = ''
+}
 
 function isFavorite(name: string) {
   return favoriteTools.value.includes(name)
@@ -224,8 +253,13 @@ function handleIntentPreload(name: string) {
 }
 
 onMounted(() => {
+  window.addEventListener('keydown', handlePageKeydown)
   refreshDownloadedTools()
   void preloadToolsByNamesInBackground([...favoriteTools.value, ...recentTools.value]).then(refreshDownloadedTools)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handlePageKeydown)
 })
 </script>
 
@@ -236,19 +270,15 @@ onMounted(() => {
       <div class="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-primary/16 blur-3xl" />
       <div class="pointer-events-none absolute bottom-0 right-20 h-48 w-48 rounded-full bg-secondary/14 blur-3xl" />
 
-      <div class="relative grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-end">
-        <div>
+      <div class="relative flex w-full flex-col gap-7">
+        <div class="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <UBadge
             color="primary"
             variant="soft"
-            class="mb-5 rounded-full px-3 py-1 text-xs font-semibold tracking-wider uppercase"
+            class="w-fit rounded-full px-3 py-1 text-xs font-semibold tracking-wider uppercase"
           >
             {{ t('app.tagline') }}
           </UBadge>
-          <div class="flex max-w-4xl flex-col gap-4 xl:flex-row xl:items-start">
-            <h1 class="max-w-3xl text-balance text-4xl font-black tracking-tight text-highlighted md:text-5xl lg:text-6xl">
-              {{ t('app.heroTitle') }}
-            </h1>
             <UModal
               v-model:open="offlineDownloadOpen"
               :ui="{
@@ -467,11 +497,16 @@ onMounted(() => {
               </template>
             </UModal>
           </div>
-          <p class="mt-5 max-w-2xl text-base leading-8 text-muted md:text-lg">
-            {{ t('app.heroDesc') }}
-          </p>
+          <div class="space-y-5">
+            <h1 class="text-balance text-4xl font-black tracking-tight text-highlighted md:text-5xl lg:text-6xl">
+              {{ t('app.heroTitle') }}
+            </h1>
+            <p class="w-full text-base leading-8 text-muted md:text-lg">
+              {{ t('app.heroDesc') }}
+            </p>
+          </div>
 
-          <div class="mt-7 flex flex-wrap gap-2">
+          <div class="flex flex-wrap gap-2">
             <UBadge
               v-for="b in ['localProcessing', 'offline', 'noExternalDeps', 'mobileReady']"
               :key="b"
@@ -482,23 +517,16 @@ onMounted(() => {
               {{ t(`app.badges.${b}`) }}
             </UBadge>
           </div>
-        </div>
 
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:grid-cols-1">
-          <div
-            v-for="item in stats"
-            :key="item.label"
-            class="hig-subtle-surface rounded-[1.75rem] border p-4"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <UIcon :name="item.icon" class="size-5" />
-              </div>
-              <div class="text-3xl font-black tracking-tight text-highlighted">{{ item.value }}</div>
-            </div>
-            <div class="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-muted">{{ item.label }}</div>
-          </div>
-        </div>
+          <UAlert
+            color="primary"
+            variant="soft"
+            icon="i-lucide-monitor-down"
+            orientation="horizontal"
+            class="w-full rounded-[1.75rem] border border-primary/20 bg-primary/10"
+            :title="t('app.installAppTitle')"
+            :description="t('app.installAppDesc')"
+          />
       </div>
     </section>
 
@@ -559,10 +587,11 @@ onMounted(() => {
         <div>
           <div class="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.18em] text-muted">
             <span class="h-1.5 w-1.5 rounded-full bg-primary" />
-            Tool Matrix
+            {{ t('app.toolMatrix') }}
           </div>
           <h2 class="text-2xl font-black tracking-tight text-highlighted">{{ t('app.allTools') }}</h2>
           <p class="mt-1 text-sm text-muted">{{ t('app.chooseTool') }}</p>
+          <p class="mt-2 text-xs text-muted">{{ t('app.keyboardHint') }}</p>
         </div>
         <UBadge
           color="neutral"
@@ -575,14 +604,30 @@ onMounted(() => {
 
       <div class="hig-panel overflow-hidden rounded-[1.75rem] border p-2">
         <UInput
+          :id="searchInputId"
           v-model="search"
+          type="search"
           icon="i-lucide-search"
           :placeholder="t('app.searchTools')"
+          :aria-label="t('app.searchTools')"
           size="xl"
           variant="ghost"
           class="w-full"
           :ui="{ base: 'rounded-2xl text-base', leadingIcon: 'size-5 text-primary' }"
+          @keydown.enter="openFirstSearchResult"
+          @keydown.esc="clearSearch"
         />
+      </div>
+
+      <div v-if="!toolCards.length" class="hig-panel rounded-[1.75rem] border p-8 text-center">
+        <div class="mx-auto flex size-12 items-center justify-center rounded-2xl bg-elevated text-primary">
+          <UIcon name="i-lucide-search-x" class="size-6" />
+        </div>
+        <h3 class="mt-4 text-base font-bold text-highlighted">{{ t('app.noToolsFound') }}</h3>
+        <p class="mt-2 text-sm text-muted">{{ t('app.noToolsFoundDesc') }}</p>
+        <UButton color="neutral" variant="soft" class="mt-4 rounded-full" @click="clearSearch">
+          {{ t('app.clear') }}
+        </UButton>
       </div>
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -591,9 +636,13 @@ onMounted(() => {
           :key="tool.path"
           variant="subtle"
           class="group"
-          :ui="{ root: 'hig-panel group cursor-pointer overflow-hidden rounded-[1.75rem] border transition-all duration-300 hover:border-primary/35 hover:shadow-xl hover:shadow-primary/10', body: 'p-5' }"
+          role="link"
+          tabindex="0"
+          :aria-label="t('app.openTool', { name: tool.label })"
+          :ui="{ root: 'home-tool-card hig-panel group cursor-pointer overflow-hidden rounded-[1.75rem] border outline-none transition-all duration-300 hover:border-primary/35 hover:shadow-xl hover:shadow-primary/10 focus-visible:hig-focus', body: 'p-5' }"
           @pointerenter="handleIntentPreload(tool.name)"
           @focusin="handleIntentPreload(tool.name)"
+          @keydown="handleToolCardKeydown($event, tool.path)"
           @click="go(tool.path)"
         >
           <div class="mb-4 flex items-start justify-between gap-3">

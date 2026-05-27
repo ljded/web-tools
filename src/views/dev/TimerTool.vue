@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useReminder } from '@/composables/useReminder'
 import ToolPage from '@/components/tool/ToolPage.vue'
 import ToolSection from '@/components/tool/ToolSection.vue'
 import { usePersistedRef } from '@/utils/persist'
+
+const { t } = useI18n()
 
 const totalSeconds = usePersistedRef('web-tools:timer:total-seconds', 300)
 const remainingSeconds = usePersistedRef('web-tools:timer:remaining-seconds', 300)
@@ -33,6 +36,10 @@ const displayTime = computed(() => {
   const s = remainingSeconds.value % 60
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 })
+const statusText = computed(() => {
+  if (running.value) return t('tools.timer.running')
+  return remainingSeconds.value <= 0 ? t('tools.timer.finished') : t('tools.timer.paused')
+})
 
 function stopTick() {
   if (!timer) return
@@ -46,8 +53,8 @@ function completeTimer() {
   deadlineAt.value = null
   stopTick()
   notify({
-    title: '计时结束',
-    description: '倒计时已经完成。',
+    title: t('tools.timer.doneTitle'),
+    description: t('tools.timer.doneDesc'),
     color: 'success',
     icon: 'i-lucide-alarm-clock-check',
   })
@@ -131,7 +138,7 @@ onUnmounted(() => {
 <template>
   <ToolPage name="timer" max-width="6xl" icon="i-lucide-timer">
     <div class="tool-workspace">
-      <ToolSection :title="$t('tools.timer.quickSet')" description="预设、快捷按钮和自定义时间集中在左侧，倒计时状态始终保持可见。">
+      <ToolSection :title="$t('tools.timer.quickSet')" :description="$t('tools.timer.quickSetDesc')">
         <div class="space-y-5">
           <div class="tool-command-bar">
             <UButton
@@ -146,14 +153,14 @@ onUnmounted(() => {
             </UButton>
           </div>
           <div class="tool-control-grid">
-            <UFormField label="自定义快捷时间（分钟）" description="用逗号、空格分隔，例如 1,3,5,10。">
-              <UInput v-model="quickMinutesText" placeholder="如 1,3,5,10,15" class="w-full" />
+            <UFormField :label="$t('tools.timer.customQuickMinutes')" :description="$t('tools.timer.customQuickMinutesDesc')">
+              <UInput v-model="quickMinutesText" :placeholder="$t('tools.timer.customQuickMinutesPlaceholder')" class="w-full" />
             </UFormField>
             <UFormField :label="$t('tools.timer.customMinutes')">
               <UInput :model-value="Math.round(totalSeconds / 60)" type="number" :min="1" :max="1440" class="w-full" @update:model-value="setCustomMinutes(Number($event))" />
             </UFormField>
           </div>
-          <UAlert color="primary" variant="soft" icon="i-lucide-info" description="切到后台或最小化后会按真实时间校准，结束时会弹出提示并播放提醒音。" />
+          <UAlert color="primary" variant="soft" icon="i-lucide-info" :description="$t('tools.timer.backgroundNotice')" />
         </div>
       </ToolSection>
 
@@ -161,7 +168,7 @@ onUnmounted(() => {
         <ToolSection :title="$t('tools.timer.countdown')" compact>
           <div class="tool-stage p-6 text-center shadow-inner shadow-default/5">
             <UBadge :color="running ? 'primary' : remainingSeconds <= 0 ? 'success' : 'neutral'" variant="soft" class="mb-4 rounded-full">
-              {{ running ? '计时中' : remainingSeconds <= 0 ? '已结束' : '已暂停' }}
+              {{ statusText }}
             </UBadge>
             <div class="text-6xl font-black tracking-widest text-highlighted sm:text-7xl">{{ displayTime }}</div>
             <UProgress class="mt-5" :model-value="progress" :max="100" />
@@ -173,7 +180,7 @@ onUnmounted(() => {
                 {{ $t('tools.timer.reset') }}
               </UButton>
               <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-maximize-2" @click="fullscreen = true">
-                全屏
+                {{ $t('tools.timer.fullscreen') }}
               </UButton>
             </div>
           </div>
@@ -182,9 +189,9 @@ onUnmounted(() => {
     </div>
 
     <div v-if="fullscreen" class="tool-fullscreen-stage fixed inset-0 z-50 flex flex-col items-center justify-center p-6">
-      <UButton color="neutral" variant="ghost" icon="i-lucide-minimize-2" class="absolute right-6 top-6 rounded-full" @click="fullscreen = false">退出全屏</UButton>
+      <UButton color="neutral" variant="ghost" icon="i-lucide-minimize-2" class="absolute right-6 top-6 rounded-full" @click="fullscreen = false">{{ $t('tools.timer.exitFullscreen') }}</UButton>
       <UBadge :color="running ? 'primary' : remainingSeconds <= 0 ? 'success' : 'neutral'" variant="soft" size="lg" class="rounded-full">
-        {{ running ? '计时中' : remainingSeconds <= 0 ? '已结束' : '已暂停' }}
+        {{ statusText }}
       </UBadge>
       <div class="mt-8 text-[18vw] font-black leading-none tracking-widest text-highlighted">{{ displayTime }}</div>
       <UProgress class="mt-8 w-full max-w-4xl" :model-value="progress" :max="100" />

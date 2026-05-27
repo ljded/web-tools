@@ -32,23 +32,23 @@ ctx.onmessage = (event) => {
     if (payload.type === 'crypt') {
       const cryptor = new JSEncrypt()
       if (payload.mode === 'encrypt') {
-        if (!payload.pub) throw new Error('缺少公钥')
+        if (!payload.pub) throw new Error('__crypto_error:missing_public_key')
         cryptor.setPublicKey(payload.pub)
         const encrypted = cryptor.encrypt(payload.text)
-        if (!encrypted) throw new Error('RSA 加密失败')
+        if (!encrypted) throw new Error('__crypto_error:rsa_encrypt_failed')
         ok(id, encrypted)
         return
       }
 
-      if (!payload.pri) throw new Error('缺少私钥')
+      if (!payload.pri) throw new Error('__crypto_error:missing_private_key')
       cryptor.setPrivateKey(payload.pri)
       const decrypted = cryptor.decrypt(payload.text)
-      if (!decrypted) throw new Error('RSA 解密失败')
+      if (!decrypted) throw new Error('__crypto_error:rsa_decrypt_failed')
       ok(id, decrypted)
       return
     }
 
-    throw new Error('不支持的 RSA 命令')
+    throw new Error('__crypto_error:unsupported_command')
   } catch (error) {
     fail(id, error)
   }

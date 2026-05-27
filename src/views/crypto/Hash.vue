@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onUnmounted, ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useToolState, useFileHandler, useDebouncedCompute, useLatestTask } from '@/composables'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import FileDropZone from '@/components/FileDropZone.vue'
@@ -11,6 +12,8 @@ import { createWorkerPool } from '@/workers/pool'
 
 const MAX_TEXT_HASH_CHARS = 400_000
 const MAX_FILE_HASH_BYTES = 2 * 1024 * 1024 * 1024
+
+const { t } = useI18n()
 
 const { input, history, saveHistory, reset } = useToolState<string, { input: string }>({
   storageKey: 'hash',
@@ -47,7 +50,7 @@ async function computeTextHashes() {
   }
   if (text.length > MAX_TEXT_HASH_CHARS) {
     textResults.value = []
-    textHashNotice.value = `文本过长，已暂停实时哈希计算。请控制在 ${MAX_TEXT_HASH_CHARS.toLocaleString()} 字符以内。`
+    textHashNotice.value = t('tools.hash.textTooLong', { max: MAX_TEXT_HASH_CHARS.toLocaleString() })
     return
   }
   const lease = await hashWorkerPool.acquire()
@@ -108,7 +111,7 @@ async function computeFileHash() {
     const result = await lease.send<Record<string, string>>({ type: 'file-finish', sessionId })
     if (isCurrent()) fileHashes.value = result
   } catch {
-    if (isCurrent()) fileHashes.value = { 错误: '计算出错' }
+    if (isCurrent()) fileHashes.value = { [t('app.error')]: t('tools.hash.computeError') }
   } finally {
     lease.release()
     if (isCurrent()) {
@@ -129,9 +132,14 @@ function onFiles(files: File[]) {
   if (first) setFile(first)
 }
 
+function localizeHashValue(value: string) {
+  if (value === '__hash_error:sm3_file_unsupported') return t('tools.hash.sm3NotSupported')
+  return value
+}
+
 const displayResults = computed(() => {
   if (fileHandler.file.value) {
-    return Object.entries(fileHashes.value).map(([name, value]) => ({ name, value }))
+    return Object.entries(fileHashes.value).map(([name, value]) => ({ name, value: localizeHashValue(value) }))
   }
   return textResults.value
 })
@@ -140,7 +148,7 @@ const displayResults = computed(() => {
 <template>
   <ToolPage name="hash" max-width="6xl" icon="i-lucide-fingerprint">
     <div class="tool-workspace">
-      <ToolSection title="输入内容" description="输入文本或拖拽文件，文件会使用 Worker 分块计算。">
+      <ToolSection :title="$t('tools.hash.inputLabel')" :description="$t('tools.hash.inputDesc')">
       <template #actions>
         <HistoryPanel
           :items="history.items.value"
@@ -149,7 +157,7 @@ const displayResults = computed(() => {
           @clear="history.clear"
         />
         <UButton
-          label="清空"
+          :label="$t('app.clear')"
           color="neutral"
           variant="ghost"
           @click="clearAll"
@@ -159,8 +167,8 @@ const displayResults = computed(() => {
 
       <FileDropZone
         v-if="!fileHandler.file.value"
-        title="拖拽文件到此处，或点击上传"
-        hint="支持 Worker 分块计算 MD5 / SHA1 / SHA256 / SHA512，单文件最大 2GB"
+        :title="$t('tools.hash.dropFile')"
+        :hint="$t('tools.hash.fileHint')"
         @files="onFiles"
       />
 
@@ -185,7 +193,7 @@ const displayResults = computed(() => {
         v-if="!fileHandler.file.value"
         v-model="input"
         @blur="saveHistory"
-        placeholder="输入要计算哈希的内容..."
+        :placeholder="$t('tools.hash.placeholder')"
         :rows="8"
         autoresize
         :maxrows="12"
@@ -206,11 +214,11 @@ const displayResults = computed(() => {
             :key="item.name"
             :title="item.name"
             :value="item.value"
-            :copyable="!!item.value && !item.value.startsWith('SM3') && !item.value.startsWith('错误')"
+            :copyable="!!item.value && !item.value.startsWith('SM3') && item.name !== $t('app.error')"
             compact
           >
-            <span v-if="isComputing && fileHandler.file.value" class="text-muted">计算中 {{ hashProgress }}%</span>
-            <span v-else>{{ item.value || '等待输入...' }}</span>
+            <span v-if="isComputing && fileHandler.file.value" class="text-muted">{{ $t('tools.hash.progress', { progress: hashProgress }) }}</span>
+            <span v-else>{{ item.value || $t('app.waitingForInput') }}</span>
           </ResultPanel>
         </div>
       </ToolSection>
@@ -221,14 +229,14 @@ const displayResults = computed(() => {
           :key="item.name"
           :title="item.name"
           :value="item.value"
-          :copyable="!!item.value && !item.value.startsWith('SM3') && !item.value.startsWith('错误')"
+          :copyable="!!item.value && !item.value.startsWith('SM3') && item.name !== $t('app.error')"
           max-height="160px"
           compact
         >
-          <span v-if="isComputing && fileHandler.file.value" class="text-muted">计算中 {{ hashProgress }}%</span>
-          <span v-else>{{ item.value || '等待输入...' }}</span>
+          <span v-if="isComputing && fileHandler.file.value" class="text-muted">{{ $t('tools.hash.progress', { progress: hashProgress }) }}</span>
+          <span v-else>{{ item.value || $t('app.waitingForInput') }}</span>
         </ResultPanel>
-        <ResultPanel v-if="!displayResults.length" title="结果" value="" empty-text="等待输入..." />
+        <ResultPanel v-if="!displayResults.length" :title="$t('app.result')" value="" :empty-text="$t('app.waitingForInput')" />
       </div>
     </div>
   </ToolPage>

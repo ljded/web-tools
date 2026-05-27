@@ -12,7 +12,21 @@ const preference = usePreferenceStore()
 const { t } = useI18n()
 const uiLocale = computed(() => (preference.locale === 'zh-CN' ? zh_cn : en))
 const toast = useToast()
-const { needRefresh, updateServiceWorker } = useRegisterSW({ immediate: true })
+const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000
+const { needRefresh, updateServiceWorker } = useRegisterSW({
+  immediate: true,
+  onRegisteredSW(_swUrl, registration) {
+    if (!registration) return
+
+    const checkForUpdate = () => {
+      if (navigator.onLine) void registration.update()
+    }
+
+    checkForUpdate()
+    window.addEventListener('online', checkForUpdate)
+    window.setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL)
+  },
+})
 let updateToastShown = false
 
 watch(needRefresh, (needsRefresh) => {
@@ -20,6 +34,7 @@ watch(needRefresh, (needsRefresh) => {
   updateToastShown = true
   toast.add({
     title: t('app.appUpdateTitle'),
+    description: t('app.appUpdateDesc'),
     color: 'info',
     duration: 0,
     actions: [

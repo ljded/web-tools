@@ -179,6 +179,35 @@
     box-shadow: 0 1px 0 color-mix(in oklab, white 22%, transparent) inset;
   }
 
+  .home-tool-card {
+    contain: paint;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .home-tool-card {
+      transition-property: border-color, box-shadow;
+    }
+
+    .home-tool-card:hover {
+      border-color: color-mix(in oklab, var(--ui-border) 70%, transparent) !important;
+      box-shadow:
+        0 1px 0 color-mix(in oklab, white 30%, transparent) inset,
+        0 16px 46px color-mix(in oklab, CanvasText 7%, transparent) !important;
+    }
+
+    .dark .home-tool-card:hover {
+      box-shadow:
+        0 1px 0 color-mix(in oklab, white 8%, transparent) inset,
+        0 22px 70px color-mix(in oklab, black 34%, transparent) !important;
+    }
+
+    .home-tool-card .group-hover\:scale-110 {
+      transform: none !important;
+    }
+  }
+
   .tool-list-item {
     border-radius: 1rem;
     border: 1px solid color-mix(in oklab, var(--ui-border) 68%, transparent);
