@@ -15,6 +15,7 @@ declare module 'vue' {
     ErrorBoundary: typeof import('./src/components/ErrorBoundary.vue')['default']
     FileDropZone: typeof import('./src/components/FileDropZone.vue')['default']
     HistoryPanel: typeof import('./src/components/HistoryPanel.vue')['default']
+    HostedAppFrame: typeof import('./src/components/tool/HostedAppFrame.vue')['default']
     JsonTree: typeof import('./src/components/JsonTree.vue')['default']
     ModeSwitch: typeof import('./src/components/ModeSwitch.vue')['default']
     MonacoEditor: typeof import('./src/components/MonacoEditor.vue')['default']
