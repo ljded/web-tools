@@ -50,7 +50,9 @@ export default defineConfig(({ command }) => ({
         cleanupOutdatedCaches: true,
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,svg,webmanifest,woff2,mjs,ttf}'],
+        globIgnores: ['apps/**/*'],
         navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/apps\//],
         runtimeCaching: [
           {
             urlPattern: ({ request, sameOrigin }) =>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GeoGebra Classic</title>
+  <style>
+    html,
+    body,
+    #ggb-element {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="ggb-element"></div>
+  <script src="GeoGebra/deployggb.js"></script>
+  <script>
+    var serviceWorkerPath = '/apps/geogebra/sworker-locked.js'
+    var appletLocation = '/apps/geogebra/'
+
+    function isServiceWorkerSupported() {
+      return 'serviceWorker' in navigator && location.protocol === 'https:'
+    }
+
+    function installServiceWorker() {
+      if (navigator.serviceWorker.controller) {
+        console.log('Service worker is already controlling the page.')
+      } else {
+        navigator.serviceWorker.register(serviceWorkerPath, {
+          scope: appletLocation,
+        })
+      }
+    }
+
+    if (isServiceWorkerSupported()) {
+      window.addEventListener('load', function () {
+        installServiceWorker()
+      })
+    } else {
+      console.log('Service workers are not supported.')
+    }
+
+    function getAppletSize() {
+      return {
+        width: Math.max(640, window.innerWidth || document.documentElement.clientWidth),
+        height: Math.max(420, window.innerHeight || document.documentElement.clientHeight),
+      };
+    }
+
+    const size = getAppletSize();
+    const applet = new GGBApplet({
+      id: 'ggbApplet',
+      appName: 'classic',
+      width: size.width,
+      height: size.height,
+      showToolBar: true,
+      showMenuBar: true,
+      showAlgebraInput: true,
+      enableRightClick: true,
+      enableLabelDrags: true,
+      enableShiftDragZoom: true,
+      allowStyleBar: true,
+      showResetIcon: true,
+      language: 'zh-CN',
+    }, true);
+
+    applet.setHTML5Codebase('GeoGebra/HTML5/5.0/web3d/');
+    applet.inject('ggb-element');
+
+    window.addEventListener('resize', () => {
+      const api = window.ggbApplet;
+      if (!api || typeof api.setSize !== 'function') return;
+      const next = getAppletSize();
+      api.setSize(next.width, next.height);
+    });
+  </script>
+</body>
+</html>
