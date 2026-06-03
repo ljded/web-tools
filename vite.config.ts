@@ -102,6 +102,9 @@ export default defineConfig(({ command }) => ({
             normalized.includes('node_modules/jsqr') ||
             normalized.includes('node_modules/browser-image-compression')
           ) return 'vendor-media'
+          // 优化：分离大型图表和渲染库
+          if (normalized.includes('node_modules/mermaid')) return 'vendor-mermaid'
+          if (normalized.includes('node_modules/katex')) return 'vendor-katex'
         },
       },
     },

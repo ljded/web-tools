@@ -25,12 +25,15 @@ watch(
   () => route.path,
   async (path) => {
     const tool = toolsByPath.get(path)
-    if (tool) {
+    if (tool && recentTools.value[0] !== tool.name) {
       const next = [tool.name, ...recentTools.value.filter((item) => item !== tool.name)].slice(0, 8)
       recentTools.value = next
     }
+
     await nextTick()
-    mainContentRef.value?.focus({ preventScroll: true })
+    if (document.activeElement !== mainContentRef.value) {
+      mainContentRef.value?.focus({ preventScroll: true })
+    }
   },
   { immediate: true },
 )

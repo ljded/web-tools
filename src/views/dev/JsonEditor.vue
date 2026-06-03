@@ -94,14 +94,28 @@ function openFind() {
   if (editor) (editor as any).getAction('actions.find')?.run()
 }
 
+// 使用防抖验证 JSON，延迟 300ms 提升性能
 let validateTimer: ReturnType<typeof setTimeout> | null = null
 function validateJson() {
   if (validateTimer) clearTimeout(validateTimer)
   validateTimer = setTimeout(() => {
-    if (!input.value.trim()) { error.value = ''; parsed.value = null; status.value = ''; return }
-    try { const obj = JSON.parse(input.value); parsed.value = obj; status.value = t('tools.json.validJson'); error.value = '' }
-    catch (e: any) { error.value = e.message || t('tools.json.jsonFormatError'); parsed.value = null; status.value = '' }
-  }, 200)
+    if (!input.value.trim()) {
+      error.value = ''
+      parsed.value = null
+      status.value = ''
+      return
+    }
+    try {
+      const obj = JSON.parse(input.value)
+      parsed.value = obj
+      status.value = t('tools.json.validJson')
+      error.value = ''
+    } catch (e: any) {
+      error.value = e.message || t('tools.json.jsonFormatError')
+      parsed.value = null
+      status.value = ''
+    }
+  }, 300)
 }
 
 watch(input, validateJson, { immediate: true })
@@ -110,31 +124,28 @@ watch(input, validateJson, { immediate: true })
 <template>
   <ToolPage name="json" max-width="6xl">
     <ToolSection compact>
-      <div class="tool-command-bar justify-between">
-        <div class="flex flex-wrap items-center gap-2">
-          <UBadge :color="error ? 'error' : status ? 'success' : 'neutral'" variant="soft" size="sm" class="rounded-full">
-            {{ error ? $t('tools.json.formatError') : status || $t('tools.json.waitingInput') }}
-          </UBadge>
-          <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-search" class="rounded-full" @click="openFind">{{ $t('app.search') }}</UButton>
-          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-align-left" class="rounded-full" @click="formatJson">{{ $t('app.format') }}</UButton>
-          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-minimize-2" class="rounded-full" @click="compressJson">{{ $t('app.compress') }}</UButton>
-          <UButton color="neutral" variant="soft" size="sm" class="rounded-full" @click="escapeJson">{{ $t('tools.json.escape') }}</UButton>
-          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-key-round" class="rounded-full" @click="parseJwt">{{ $t('tools.json.parseJwt') }}</UButton>
-          <CopyBtn :text="input" variant="button" />
-          <UButton
-            color="primary"
-            variant="soft"
-            size="sm"
-            :label="showTree ? $t('tools.json.hideTree') : $t('tools.json.showTree')"
-            :icon="showTree ? 'i-lucide-panel-right-close' : 'i-lucide-panel-right-open'"
-            class="rounded-full"
-            @click="toggleTree"
-          />
-        </div>
-      </div>
+      <template #actions>
+        <HistoryPanel :items="history.items.value" @select="onHistorySelect" @remove="history.remove" @clear="history.clear" />
+        <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-search" class="rounded-full" @click="openFind">{{ $t('app.search') }}</UButton>
+        <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-align-left" class="rounded-full" @click="formatJson">{{ $t('app.format') }}</UButton>
+        <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-minimize-2" class="rounded-full" @click="compressJson">{{ $t('app.compress') }}</UButton>
+        <UButton color="neutral" variant="soft" size="sm" class="rounded-full" @click="escapeJson">{{ $t('tools.json.escape') }}</UButton>
+        <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-key-round" class="rounded-full" @click="parseJwt">{{ $t('tools.json.parseJwt') }}</UButton>
+        <CopyBtn :text="input" variant="button" />
+        <UButton
+          color="primary"
+          variant="soft"
+          size="sm"
+          :label="showTree ? $t('tools.json.hideTree') : $t('tools.json.showTree')"
+          :icon="showTree ? 'i-lucide-panel-right-close' : 'i-lucide-panel-right-open'"
+          class="rounded-full"
+          @click="toggleTree"
+        />
+      </template>
+
+      <UBadge :color="error ? 'error' : status ? 'success' : 'neutral'" variant="soft" size="sm" class="rounded-full">
+        {{ error ? $t('tools.json.formatError') : status || $t('tools.json.waitingInput') }}
+      </UBadge>
     </ToolSection>
 
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.78fr)]">

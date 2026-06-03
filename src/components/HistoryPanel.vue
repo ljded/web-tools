@@ -21,23 +21,71 @@ const emit = defineEmits<{
 }>()
 
 const open = ref(false)
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+// 全局时间格式化缓存
+const timeFormatCache = new Map<string, string>()
+
+// 定期清理缓存（避免内存泄漏）
+let cacheCleanupTimer: ReturnType<typeof setInterval> | null = null
+if (typeof window !== 'undefined') {
+  cacheCleanupTimer = setInterval(() => {
+    if (timeFormatCache.size > 1000) {
+      timeFormatCache.clear()
+    }
+  }, 60000)
+}
 
 function formatTime(ts: number): string {
+  // 生成缓存键（包含语言环境以支持多语言）
+  const cacheKey = `${ts}-${locale.value}`
+
+  if (timeFormatCache.has(cacheKey)) {
+    return timeFormatCache.get(cacheKey)!
+  }
+
   const d = new Date(ts)
   const diff = Date.now() - d.getTime()
-  if (diff < 60_000) return t('app.justNow')
-  if (diff < 3600_000) return t('app.minutesAgo', { n: Math.floor(diff / 60_000) })
-  if (diff < 86400_000) return t('app.hoursAgo', { n: Math.floor(diff / 3600_000) })
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+
+  let formatted: string
+  if (diff < 60_000) {
+    formatted = t('app.justNow')
+  } else if (diff < 3600_000) {
+    formatted = t('app.minutesAgo', { n: Math.floor(diff / 60_000) })
+  } else if (diff < 86400_000) {
+    formatted = t('app.hoursAgo', { n: Math.floor(diff / 3600_000) })
+  } else {
+    formatted = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
+  timeFormatCache.set(cacheKey, formatted)
+  return formatted
 }
 
 const displayTitle = computed(() => props.title || t('app.history'))
+
+// 优化：缓存时间格式化结果
+const itemsWithFormattedTime = computed(() =>
+  props.items.map(item => ({
+    ...item,
+    formattedTime: formatTime(item.timestamp)
+  }))
+)
 
 function onSelect(item: HistoryItem) {
   emit('select', item)
   open.value = false
 }
+
+// 清理缓存计时器
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    if (cacheCleanupTimer) {
+      clearInterval(cacheCleanupTimer)
+    }
+  })
+}
+
 </script>
 
 <template>
@@ -87,7 +135,7 @@ function onSelect(item: HistoryItem) {
 
         <div v-else class="max-h-72 overflow-auto py-1">
           <div
-            v-for="item in items"
+            v-for="item in itemsWithFormattedTime"
             :key="item.id"
             class="flex w-full items-center gap-2 px-3 py-2 hover:bg-accented"
           >
@@ -100,7 +148,7 @@ function onSelect(item: HistoryItem) {
               <div class="truncate text-xs text-default">{{ item.label }}</div>
               <div class="mt-0.5 flex items-center gap-1 text-xs text-muted">
                 <UIcon name="i-lucide-clock" class="size-2.5" />
-                {{ formatTime(item.timestamp) }}
+                {{ item.formattedTime }}
               </div>
             </UButton>
             <UButton

@@ -194,22 +194,21 @@ function clearAll() {
         </ToolSection>
 
         <ToolSection :title="$t('tools.picker.ruleTitle')" :description="$t('tools.picker.ruleDesc')">
+          <template #actions>
+            <UButton color="primary" variant="soft" size="sm" class="rounded-full" icon="i-lucide-dices" @click="pick">{{ $t('tools.picker.pickNow') }}</UButton>
+            <UButton color="neutral" variant="soft" size="sm" class="rounded-full" icon="i-lucide-eraser" @click="clearAll">{{ $t('tools.picker.clear') }}</UButton>
+          </template>
+
           <div class="space-y-5">
             <UFormField :label="$t('tools.picker.rewardLabel')" :description="$t('tools.picker.rewardDesc')">
               <UTextarea v-model="rewardText" :rows="4" :placeholder="$t('tools.picker.rewardPlaceholder')" class="w-full" />
             </UFormField>
 
-            <div class="tool-command-bar justify-between">
-              <div class="flex flex-wrap items-center gap-3">
-                <UFormField :label="$t('tools.picker.pickCount')" class="w-32">
-                  <UInput :model-value="pickCount" type="number" :min="1" :max="200" class="w-full" @update:model-value="pickCount = Math.max(1, Math.min(Number($event) || 1, 200))" />
-                </UFormField>
-                <UCheckbox v-model="uniqueOnly" :label="$t('tools.picker.uniqueOnly')" />
-              </div>
-              <div class="flex flex-wrap gap-2">
-                <UButton color="primary" class="rounded-full" icon="i-lucide-dices" @click="pick">{{ $t('tools.picker.pickNow') }}</UButton>
-                <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-eraser" @click="clearAll">{{ $t('tools.picker.clear') }}</UButton>
-              </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <UFormField :label="$t('tools.picker.pickCount')" class="w-32">
+                <UInput :model-value="pickCount" type="number" :min="1" :max="200" class="w-full" @update:model-value="pickCount = Math.max(1, Math.min(Number($event) || 1, 200))" />
+              </UFormField>
+              <UCheckbox v-model="uniqueOnly" :label="$t('tools.picker.uniqueOnly')" />
             </div>
           </div>
         </ToolSection>

@@ -28,7 +28,8 @@ const favoriteNavigationItems = computed(() =>
 </script>
 
 <template>
-  <aside class="glass-panel flex h-full w-80 flex-col border-e border-default/60" role="navigation" :aria-label="t('app.navigation')">
+  <aside class="glass-panel flex h-full w-80 flex-col border-e border-default/60">
+    <nav class="flex h-full flex-col" role="navigation" :aria-label="t('app.navigation')">
     <div class="px-4 pb-4 pt-5">
       <div class="hig-panel flex items-center gap-3 rounded-[1.65rem] border p-3.5">
         <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-contrast shadow-lg shadow-primary/20">
@@ -43,7 +44,7 @@ const favoriteNavigationItems = computed(() =>
       </div>
     </div>
 
-    <nav class="flex-1 space-y-3 overflow-y-auto px-3 pb-3">
+    <div class="flex-1 space-y-3 overflow-y-auto px-3 pb-3">
       <UCard
         v-if="favoriteNavigationItems.length"
         variant="subtle"
@@ -76,14 +77,15 @@ const favoriteNavigationItems = computed(() =>
           childLink: 'rounded-xl px-3 py-2 text-sm',
         }"
       />
-    </nav>
+    </div>
 
     <div class="border-t border-default/70 px-4 py-4">
       <a
         href="https://github.com/ljded/web-tools"
         target="_blank"
-        rel="noopener"
+        rel="noopener noreferrer"
         class="flex items-center justify-between gap-2 rounded-2xl border border-default bg-default/60 px-3 py-2 text-xs font-medium text-muted shadow-sm transition-colors hover:bg-accented hover:text-default"
+        :aria-label="t('app.viewOnGithub')"
       >
         <span class="flex min-w-0 items-center gap-2">
           <UIcon name="i-lucide-github" class="size-4 shrink-0" />
@@ -92,5 +94,6 @@ const favoriteNavigationItems = computed(() =>
         <span class="font-mono text-[0.68rem] text-dimmed">v{{ appVersion }}</span>
       </a>
     </div>
+    </nav>
   </aside>
 </template>

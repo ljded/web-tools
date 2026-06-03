@@ -2,7 +2,7 @@
 import { useRouter } from 'vue-router'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { domainI18nKeys, offlineTools as registryOfflineTools, toolsByName, type ToolDomain } from '@/tools/registry'
+import { domainI18nKeys, offlineTools as registryOfflineTools, toolsByName, type ToolDefinition, type ToolDomain } from '@/tools/registry'
 import { getPreloadedToolNames, getPreloadedToolsStorageStatus, preloadToolByName, preloadToolByNameNow, preloadToolsByNamesInBackground } from '@/tools/preload'
 import { searchTools } from '@/tools/search'
 import { usePersistedRef } from '@/utils/persist'
@@ -13,7 +13,7 @@ const OFFLINE_DOWNLOAD_SELECTION_KEY = 'web-tools:offline-download-selection'
 const searchInputId = 'home-tool-search'
 
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const toast = useToast()
 const search = ref('')
 const downloadingOfflineTools = ref(false)
@@ -32,6 +32,7 @@ const toolCards = computed(() =>
     favoriteNames: favoriteTools.value,
     recentNames: recentTools.value,
     preferredCapabilities: ['offline'],
+    cacheKey: locale.value,
   }).map(({ tool, label, description, path, feature }) => ({
     ...tool,
     path,
@@ -41,14 +42,17 @@ const toolCards = computed(() =>
   })),
 )
 
-const offlineTools = computed(() => registryOfflineTools)
-const offlineToolCards = computed(() => offlineTools.value.map((tool) => ({
+const offlineTools = registryOfflineTools
+const favoriteToolSet = computed(() => new Set(favoriteTools.value))
+const selectedOfflineToolSet = computed(() => new Set(selectedOfflineToolNames.value))
+const offlineToolCards = computed(() => offlineTools.map((tool) => ({
   ...tool,
   label: t(`${tool.i18nKey}.title`),
   desc: t(`${tool.i18nKey}.desc`),
 })))
-const selectedOfflineTools = computed(() => selectedOfflineToolNames.value.filter((name) => toolsByName.get(name)?.capabilities?.includes('offline')))
-const pendingOfflineTools = computed(() => offlineTools.value.filter((tool) => !downloadedToolNames.value.has(tool.name)))
+const offlineToolCardByName = computed(() => new Map(offlineToolCards.value.map((tool) => [tool.name, tool])))
+const selectedOfflineTools = computed(() => [...selectedOfflineToolSet.value].filter((name) => toolsByName.get(name)?.capabilities?.includes('offline')))
+const pendingOfflineTools = computed(() => offlineTools.filter((tool) => !downloadedToolNames.value.has(tool.name)))
 const filteredOfflineToolCards = computed(() => offlineToolCards.value.filter((tool) => {
   if (offlineFilter.value === 'pending') return !downloadedToolNames.value.has(tool.name)
   if (offlineFilter.value === 'downloaded') return downloadedToolNames.value.has(tool.name)
@@ -65,42 +69,63 @@ const groupedOfflineToolCards = computed(() => {
     items,
   }))
 })
-const downloadedOfflineCount = computed(() => offlineTools.value.filter((tool) => downloadedToolNames.value.has(tool.name)).length)
+const downloadedOfflineCount = computed(() => offlineTools.filter((tool) => downloadedToolNames.value.has(tool.name)).length)
 const heavyOfflineToolNames = new Set(['crypto', 'hash', 'json', 'js-sandbox', 'diff', 'qrcode', 'image', 'pdf'])
 const heavyOfflineTools = computed(() => offlineToolCards.value.filter((tool) => heavyOfflineToolNames.has(tool.name)))
 const lightOfflineTools = computed(() => offlineToolCards.value.filter((tool) => !heavyOfflineToolNames.has(tool.name)))
 const failedOfflineToolLabels = computed(() => failedOfflineToolNames.value
-  .map((name) => offlineToolCards.value.find((tool) => tool.name === name)?.label ?? name)
+  .map((name) => offlineToolCardByName.value.get(name)?.label ?? name)
   .join(t('app.listSeparator')))
 const offlineDownloadProgress = computed(() => {
-  if (!offlineTools.value.length) return 0
-  return Math.round((downloadedOfflineCount.value / offlineTools.value.length) * 100)
+  if (!offlineTools.length) return 0
+  return Math.round((downloadedOfflineCount.value / offlineTools.length) * 100)
 })
 const suggestedOfflineToolNames = computed(() => [...new Set([...favoriteTools.value, ...recentTools.value])].filter((name) => toolsByName.get(name)?.capabilities?.includes('offline')))
 
-const favoriteCards = computed(() =>
-  favoriteTools.value
-    .map((name) => toolsByName.get(name))
-    .filter((tool): tool is NonNullable<typeof tool> => Boolean(tool))
-    .map((tool) => ({
-      ...tool,
-      label: t(`${tool.i18nKey}.title`),
-      desc: t(`${tool.i18nKey}.desc`),
-    })),
-)
+const favoriteCards = computed(() => {
+  const result = []
+  for (const name of favoriteTools.value) {
+    const tool = toolsByName.get(name)
+    if (tool) {
+      result.push({
+        ...tool,
+        label: t(`${tool.i18nKey}.title`),
+        desc: t(`${tool.i18nKey}.desc`),
+      })
+    }
+  }
+  return result
+})
 
-const recentCards = computed(() =>
-  recentTools.value
-    .map((name) => toolsByName.get(name))
-    .filter((tool): tool is NonNullable<typeof tool> => Boolean(tool))
-    .slice(0, 6)
-    .map((tool) => ({
-      ...tool,
-      label: t(`${tool.i18nKey}.title`),
-      desc: t(`${tool.i18nKey}.desc`),
-    })),
-)
+const recentCards = computed(() => {
+  const result = []
+  let count = 0
+  for (const name of recentTools.value) {
+    if (count >= 6) break
+    const tool = toolsByName.get(name)
+    if (tool) {
+      result.push({
+        ...tool,
+        label: t(`${tool.i18nKey}.title`),
+        desc: t(`${tool.i18nKey}.desc`),
+      })
+      count++
+    }
+  }
+  return result
+})
 
+type ToolCard = (typeof offlineToolCards.value)[number]
+
+function createLabeledTool(tool: ToolDefinition) {
+  return {
+    ...tool,
+    label: t(`${tool.i18nKey}.title`),
+    desc: t(`${tool.i18nKey}.desc`),
+  }
+}
+
+const intentPreloadedToolNames = new Set<string>()
 
 function go(path: string) { router.push(path) }
 
@@ -136,11 +161,11 @@ function clearSearch() {
 }
 
 function isFavorite(name: string) {
-  return favoriteTools.value.includes(name)
+  return favoriteToolSet.value.has(name)
 }
 
 function toggleFavorite(name: string) {
-  if (favoriteTools.value.includes(name)) {
+  if (favoriteToolSet.value.has(name)) {
     favoriteTools.value = favoriteTools.value.filter((item) => item !== name)
     return
   }
@@ -153,7 +178,7 @@ function refreshDownloadedTools() {
 }
 
 function isOfflineSelected(name: string) {
-  return selectedOfflineToolNames.value.includes(name)
+  return selectedOfflineToolSet.value.has(name)
 }
 
 function isDownloaded(name: string) {
@@ -161,7 +186,7 @@ function isDownloaded(name: string) {
 }
 
 function toggleOfflineSelection(name: string) {
-  if (selectedOfflineToolNames.value.includes(name)) {
+  if (selectedOfflineToolSet.value.has(name)) {
     selectedOfflineToolNames.value = selectedOfflineToolNames.value.filter((item) => item !== name)
     return
   }
@@ -169,7 +194,7 @@ function toggleOfflineSelection(name: string) {
 }
 
 function selectAllOfflineTools() {
-  selectedOfflineToolNames.value = offlineTools.value.map((tool) => tool.name)
+  selectedOfflineToolNames.value = offlineTools.map((tool) => tool.name)
 }
 
 function selectPendingOfflineTools() {
@@ -179,7 +204,7 @@ function selectPendingOfflineTools() {
 function selectSuggestedOfflineTools() {
   selectedOfflineToolNames.value = suggestedOfflineToolNames.value.length
     ? suggestedOfflineToolNames.value
-    : offlineTools.value.slice(0, 6).map((tool) => tool.name)
+    : offlineTools.slice(0, 6).map((tool) => tool.name)
 }
 
 function clearOfflineSelection() {
@@ -244,12 +269,17 @@ async function downloadPendingOfflineTools() {
 }
 
 async function downloadAllOfflineTools() {
-  await downloadOfflineTools(offlineTools.value.map((tool) => tool.name), t('app.offlineDownload.noOfflineToolsDesc'))
+  await downloadOfflineTools(offlineTools.map((tool) => tool.name), t('app.offlineDownload.noOfflineToolsDesc'))
 }
 
 function handleIntentPreload(name: string) {
+  if (intentPreloadedToolNames.has(name)) return
+  intentPreloadedToolNames.add(name)
   preloadToolByName(name)
-  window.setTimeout(refreshDownloadedTools, 1200)
+  window.setTimeout(() => {
+    intentPreloadedToolNames.delete(name)
+    refreshDownloadedTools()
+  }, 1200)
 }
 
 onMounted(() => {
@@ -630,13 +660,13 @@ onBeforeUnmount(() => {
         </UButton>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" role="list">
         <UCard
           v-for="tool in toolCards"
           :key="tool.path"
           variant="subtle"
-          class="group"
-          role="link"
+          class="group tool-card-optimized"
+          role="listitem"
           tabindex="0"
           :aria-label="t('app.openTool', { name: tool.label })"
           :ui="{ root: 'home-tool-card hig-panel group cursor-pointer overflow-hidden rounded-[1.75rem] border outline-none transition-all duration-300 hover:border-primary/35 hover:shadow-xl hover:shadow-primary/10 focus-visible:hig-focus', body: 'p-5' }"
@@ -705,3 +735,25 @@ onBeforeUnmount(() => {
     </section>
   </div>
 </template>
+
+<style scoped>
+/* CSS Performance Optimizations */
+.tool-card-optimized {
+  /* Contain layout, style, and paint to prevent unnecessary recalculations */
+  contain: layout style paint;
+  /* Auto-hide off-screen cards to improve rendering performance */
+  content-visibility: auto;
+  /* Reserve space for cards even when hidden */
+  contain-intrinsic-size: 0 200px;
+}
+
+.tool-list-item {
+  contain: layout style;
+  content-visibility: auto;
+  contain-intrinsic-size: 0 60px;
+}
+
+.tool-metric-card {
+  contain: layout style paint;
+}
+</style>

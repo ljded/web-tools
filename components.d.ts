@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     CopyBtn: typeof import('./src/components/CopyBtn.vue')['default']
+    EditorToolSection: typeof import('./src/components/tool/EditorToolSection.vue')['default']
     ErrorBoundary: typeof import('./src/components/ErrorBoundary.vue')['default']
     FileDropZone: typeof import('./src/components/FileDropZone.vue')['default']
     HistoryPanel: typeof import('./src/components/HistoryPanel.vue')['default']
@@ -22,6 +23,7 @@ declare module 'vue' {
     ResultPanel: typeof import('./src/components/ResultPanel.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    TabToolSection: typeof import('./src/components/tool/TabToolSection.vue')['default']
     ToolActions: typeof import('./src/components/tool/ToolActions.vue')['default']
     ToolCard: typeof import('./src/components/ToolCard.vue')['default']
     ToolHeader: typeof import('./src/components/ToolHeader.vue')['default']

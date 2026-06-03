@@ -5,6 +5,8 @@ import {
   getHistoryRecords,
   putHistoryRecords,
 } from './db'
+import { scheduleIdleTask } from './scheduler'
+import { deepEqual } from './deepEqual'
 
 export interface HistoryItem<T> {
   id: string
@@ -23,39 +25,22 @@ export interface UseHistoryOptions<T> {
 
 /**
  * 默认相等策略：
- * - 对 string / number / boolean 直接值比较
- * - 对 Date 比较 getTime()
- * - 其余回退到 JSON.stringify 全量比较
+ * 使用优化的 deepEqual 函数，避免 JSON 序列化
  */
 function defaultEquals<T>(a: T, b: T): boolean {
-  if (a === b) return true
-  if (a == null || b == null) return false
+  return deepEqual(a, b, 5) // 限制深度为 5，平衡性能和准确性
+}
 
-  const ta = typeof a
-  const tb = typeof b
-  if (ta !== tb) return false
-
-  if (ta === 'string' || ta === 'number' || ta === 'boolean') {
-    return a === b
+/**
+ * 安全解析 JSON
+ */
+function safeParseJSON<T>(jsonString: string): T | null {
+  try {
+    return JSON.parse(jsonString) as T
+  } catch (error) {
+    console.warn('[history] Failed to parse JSON from localStorage', error)
+    return null
   }
-
-  if (a instanceof Date && b instanceof Date) {
-    return a.getTime() === b.getTime()
-  }
-
-  if (typeof a === 'object' && typeof b === 'object') {
-    const keysA = Object.keys(a as object)
-    const keysB = Object.keys(b as object)
-    if (keysA.length !== keysB.length) return false
-    for (const key of keysA) {
-      if ((a as Record<string, unknown>)[key] !== (b as Record<string, unknown>)[key]) {
-        return false
-      }
-    }
-    return true
-  }
-
-  return false
 }
 
 export function useHistory<T extends Record<string, unknown>>(
@@ -67,7 +52,11 @@ export function useHistory<T extends Record<string, unknown>>(
   const items = shallowRef<HistoryItem<T>[]>([])
 
   let loaded = false
+  let dbReady = false  // 优化：跟踪 DB 准备状态
+  let useIndexedDB = true // 标记是否使用 IndexedDB
+  const localStorageKey = `history:${key}` // localStorage 键名
 
+  // 优化：异步加载 IndexedDB，不阻塞初始化
   async function loadFromDB() {
     try {
       const records = await getHistoryRecords<T>(key)
@@ -79,23 +68,48 @@ export function useHistory<T extends Record<string, unknown>>(
           label,
         }))
         loaded = true
+        dbReady = true
         return
       }
 
+      // 尝试从 localStorage 迁移旧数据
       const legacy = localStorage.getItem(key)
       if (legacy) {
-        const parsed = JSON.parse(legacy) as HistoryItem<T>[]
-        items.value = parsed
-        await save()
-        localStorage.removeItem(key)
+        const parsed = safeParseJSON<HistoryItem<T>[]>(legacy)
+        if (parsed && Array.isArray(parsed)) {
+          items.value = parsed
+          await save()
+          localStorage.removeItem(key)
+        }
       }
+      dbReady = true
     } catch (e) {
-      console.error('[web-tools] history load error', key, e)
-      if (!loaded) items.value = []
+      console.warn('[history] IndexedDB unavailable, falling back to localStorage', key, e)
+      useIndexedDB = false
+      dbReady = true
+
+      // 降级到 localStorage
+      loadFromLocalStorage()
     }
     loaded = true
   }
-  loadFromDB()
+
+  function loadFromLocalStorage() {
+    try {
+      const stored = localStorage.getItem(localStorageKey)
+      if (stored) {
+        const parsed = safeParseJSON<HistoryItem<T>[]>(stored)
+        if (parsed && Array.isArray(parsed)) {
+          items.value = parsed.slice(0, maxCount) // 限制数量
+        }
+      }
+    } catch (e) {
+      console.error('[history] Failed to load from localStorage', key, e)
+      items.value = []
+    }
+  }
+
+  loadFromDB() // 优化：异步加载，不 await
 
   function formatUUID(): string {
     try {
@@ -106,10 +120,31 @@ export function useHistory<T extends Record<string, unknown>>(
     return `${Date.now()}_${Math.random().toString(36).slice(2)}`
   }
 
-  function save() {
-    return putHistoryRecords(key, items.value).catch((e) => {
-      console.error('[web-tools] history save error', key, e)
-    })
+  async function save() {
+    // 优化：等待 DB 准备好
+    if (useIndexedDB && !dbReady) {
+      await loadFromDB()
+    }
+
+    if (useIndexedDB) {
+      return putHistoryRecords(key, items.value).catch((e) => {
+        console.error('[history] IndexedDB save error, falling back to localStorage', key, e)
+        useIndexedDB = false
+        saveToLocalStorage()
+      })
+    } else {
+      return saveToLocalStorage()
+    }
+  }
+
+  function saveToLocalStorage() {
+    try {
+      localStorage.setItem(localStorageKey, JSON.stringify(items.value))
+      return Promise.resolve()
+    } catch (e) {
+      console.error('[history] localStorage save error', key, e)
+      return Promise.reject(e)
+    }
   }
 
   let addTimer: ReturnType<typeof setTimeout> | null = null
@@ -152,20 +187,41 @@ export function useHistory<T extends Record<string, unknown>>(
     }
 
     items.value = arr
-    save()
+    // 优化：使用 requestIdleCallback 延迟保存，不阻塞 UI
+    scheduleIdleTask(() => save())
   }
 
   function remove(id: string) {
     items.value = items.value.filter((item) => item.id !== id)
-    deleteHistoryRecord(key, id).catch((e) => {
-      console.error('[web-tools] history remove error', key, id, e)
+
+    // 优化：使用 requestIdleCallback 延迟保存
+    scheduleIdleTask(() => {
+      if (useIndexedDB) {
+        deleteHistoryRecord(key, id).catch((e) => {
+          console.error('[history] IndexedDB remove error', key, id, e)
+        })
+      } else {
+        saveToLocalStorage()
+      }
     })
   }
 
   function clear() {
     items.value = []
-    clearHistoryRecords(key).catch((e) => {
-      console.error('[web-tools] history clear error', key, e)
+
+    // 优化：使用 requestIdleCallback 延迟清理
+    scheduleIdleTask(() => {
+      if (useIndexedDB) {
+        clearHistoryRecords(key).catch((e) => {
+          console.error('[history] IndexedDB clear error', key, e)
+        })
+      } else {
+        try {
+          localStorage.removeItem(localStorageKey)
+        } catch (e) {
+          console.error('[history] localStorage clear error', key, e)
+        }
+      }
     })
   }
 
