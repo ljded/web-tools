@@ -4,8 +4,14 @@
  */
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { TabItem } from '@nuxt/ui/dist/runtime/types'
+import { computed, useSlots } from 'vue'
+
+interface TabItem {
+  label?: string
+  value?: string
+  icon?: string
+  disabled?: boolean
+}
 
 const props = withDefaults(
   defineProps<{
@@ -47,7 +53,8 @@ const activeTab = computed({
   set: (value: string) => emit('update:modelValue', value),
 })
 
-const hasActions = computed(() => !!useSlots().actions)
+const slots = useSlots()
+const hasActions = computed(() => !!slots.actions)
 </script>
 
 <template>
@@ -61,10 +68,10 @@ const hasActions = computed(() => !!useSlots().actions)
         size="sm"
         class="flex-1"
       >
-        <template #item="{ item }">
+        <template #default="{ item }">
           <div class="flex items-center gap-2">
             <UIcon v-if="item.icon" :name="item.icon" class="size-4" />
-            <span>{{ $t(item.label) }}</span>
+            <span>{{ item.label ? $t(item.label) : '' }}</span>
           </div>
         </template>
       </UTabs>

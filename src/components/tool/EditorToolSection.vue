@@ -4,7 +4,7 @@
  */
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useSlots } from 'vue'
 import ToolSection from './ToolSection.vue'
 
 const props = withDefaults(
@@ -25,8 +25,9 @@ const props = withDefaults(
   }
 )
 
-const hasEditorActions = computed(() => !!useSlots().editorActions)
-const hasPreviewActions = computed(() => !!useSlots().previewActions)
+const slots = useSlots()
+const hasEditorActions = computed(() => !!slots.editorActions)
+const hasPreviewActions = computed(() => !!slots.previewActions)
 </script>
 
 <template>

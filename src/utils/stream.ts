@@ -58,7 +58,7 @@ export async function base64ToBlob(
   onProgress?: (progress: number) => void,
   chunkSize: number = 1024 * 1024 // 1MB of base64
 ): Promise<Blob> {
-  const chunks: Uint8Array[] = []
+  const chunks: Uint8Array<ArrayBuffer>[] = []
   let processedChars = 0
 
   // 移除 data URI 前缀
@@ -81,7 +81,7 @@ export async function base64ToBlob(
         bytes[j] = binaryString.charCodeAt(j)
       }
 
-      chunks.push(bytes)
+      chunks.push(bytes as Uint8Array<ArrayBuffer>)
     } catch (error) {
       throw new Error('Invalid base64 string')
     }
@@ -224,7 +224,7 @@ export async function compressFileStream(
   const reader = file.stream().getReader()
   const compressionStream = new CompressionStream(format)
   const writer = compressionStream.writable.getWriter()
-  const chunks: Uint8Array[] = []
+  const chunks: Uint8Array<ArrayBuffer>[] = []
 
   let bytesRead = 0
 
@@ -252,7 +252,7 @@ export async function compressFileStream(
       while (true) {
         const { done, value } = await readableReader.read()
         if (done) break
-        chunks.push(value)
+        chunks.push(value as Uint8Array<ArrayBuffer>)
       }
     })()
 
