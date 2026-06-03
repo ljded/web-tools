@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['src/**/*.{test,spec}.{ts,js}'],
     globals: true,
+    setupFiles: ['./src/test/setup.ts'],
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },

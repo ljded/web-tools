@@ -3,16 +3,23 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { copyToClipboard } from '@/utils/clipboard'
 
-const props = defineProps<{
-  data: unknown
-  name?: string
-  depth?: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    data: unknown
+    name?: string
+    depth?: number
+    maxDepth?: number
+  }>(),
+  {
+    maxDepth: 50,
+  }
+)
 
 const depth = props.depth ?? 0
 const { t, locale } = useI18n()
 const isOpen = ref(depth < 2)
 const copied = ref(false)
+const isOverMaxDepth = computed(() => depth >= props.maxDepth)
 
 const type = computed(() => {
   if (props.data === null) return 'null'
@@ -22,12 +29,32 @@ const type = computed(() => {
 
 const isComplex = computed(() => type.value === 'object' || type.value === 'array')
 
+// 优化：缓存 childKeys 计算
+const childKeysCache = new Map<unknown, string[]>()
 const childKeys = computed(() => {
-  if (!isComplex.value) return []
-  if (type.value === 'array') {
-    return (props.data as unknown[]).map((_, i) => String(i))
+  if (!isComplex.value || isOverMaxDepth.value) return []
+
+  // 检查缓存
+  if (childKeysCache.has(props.data)) {
+    return childKeysCache.get(props.data)!
   }
-  return Object.keys(props.data as Record<string, unknown>)
+
+  let keys: string[]
+  if (type.value === 'array') {
+    const arr = props.data as unknown[]
+    // 对于大数组，限制初始渲染数量
+    const limit = arr.length > 1000 ? 100 : arr.length
+    keys = Array.from({ length: limit }, (_, i) => String(i))
+  } else {
+    keys = Object.keys(props.data as Record<string, unknown>)
+    // 对于大对象，限制初始渲染数量
+    if (keys.length > 1000) {
+      keys = keys.slice(0, 100)
+    }
+  }
+
+  childKeysCache.set(props.data, keys)
+  return keys
 })
 
 const preview = computed(() => {
@@ -76,6 +103,20 @@ function valueClass(): string {
   if (t === 'null') return 'text-muted font-medium'
   return 'text-default'
 }
+
+// 清理缓存（避免内存泄漏）
+if (depth === 0) {
+  const interval = setInterval(() => {
+    if (childKeysCache.size > 500) {
+      childKeysCache.clear()
+    }
+  }, 30000)
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => clearInterval(interval))
+  }
+}
+
 </script>
 
 <template>
@@ -113,6 +154,9 @@ function valueClass(): string {
       <span v-else-if="isComplex && !isOpen" class="cursor-pointer text-muted" @click="toggle">{{
         preview
       }}</span>
+      <span v-else-if="isOverMaxDepth" class="text-muted">
+        {{ t('app.maxDepthReached', { depth: maxDepth }) || `[最大深度 ${maxDepth}]` }}
+      </span>
 
       <UButton
         @click="copyValue"
@@ -126,7 +170,7 @@ function valueClass(): string {
       />
     </div>
 
-    <div v-if="isComplex && isOpen">
+    <div v-if="isComplex && isOpen && !isOverMaxDepth">
       <JsonTree
         v-for="key in childKeys"
         :key="key"
@@ -137,6 +181,7 @@ function valueClass(): string {
             : (data as Record<string, unknown>)[key]
         "
         :depth="depth + 1"
+        :max-depth="maxDepth"
       />
       <div :style="{ paddingLeft: depth * 12 + 'px' }" class="text-muted">
         {{ type === 'array' ? ']' : '}' }}

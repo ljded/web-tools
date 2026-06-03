@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import UCommandPalette from '@nuxt/ui/components/CommandPalette.vue'
 import USlideover from '@nuxt/ui/components/Slideover.vue'
 import { offlineTools } from '@/tools/registry'
-import { searchTools } from '@/tools/search'
+import { searchTools, type ToolSearchItem } from '@/tools/search'
 import { usePersistedRef } from '@/utils/persist'
 
 const RECENT_TOOLS_KEY = 'web-tools:recent-tools'
@@ -13,38 +13,41 @@ const RECENT_TOOLS_KEY = 'web-tools:recent-tools'
 const open = defineModel<boolean>('open', { default: false })
 
 const router = useRouter()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const recentTools = usePersistedRef<string[]>(RECENT_TOOLS_KEY, [])
 const searchTerm = ref('')
+
+function toCommandItem({ tool, label, description, searchText, path }: ToolSearchItem, suffix?: string) {
+  const searchTerms = [searchText, searchText.replace(/[\s._/\\,，、:：|-]+/g, '')].join(' ')
+
+  return {
+    label,
+    description,
+    icon: tool.icon,
+    suffix: suffix ?? [tool.hotkey, tool.status, ...(tool.tags ?? []).slice(0, 2)].filter(Boolean).join(' · '),
+    searchTerms,
+    onSelect() {
+      open.value = false
+      router.push(path)
+    },
+  }
+}
 
 const groups = computed(() => {
   const items = searchTools(t, searchTerm.value, {
     recentNames: recentTools.value,
     preferredCapabilities: ['offline'],
+    cacheKey: locale.value,
   })
+  const rootItems = items.filter((item) => !item.feature)
+  const rootItemsByToolName = new Map(rootItems.map((item) => [item.tool.name, item]))
   const recentItems = recentTools.value
-    .map((name) => items.find((item) => item.tool.name === name))
+    .map((name) => rootItemsByToolName.get(name))
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
   const offlineItems = offlineTools
-    .map((tool) => items.find((item) => item.tool.name === tool.name))
+    .map((tool) => rootItemsByToolName.get(tool.name))
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
     .slice(0, 12)
-
-  const toCommandItem = ({ tool, label, description, searchText, path }: (typeof items)[number], suffix?: string) => {
-    const searchTerms = [searchText, searchText.replace(/[\s._/\\,，、:：|-]+/g, '')].join(' ')
-
-    return {
-      label,
-      description,
-      icon: tool.icon,
-      suffix: suffix ?? [tool.hotkey, tool.status, ...(tool.tags ?? []).slice(0, 2)].filter(Boolean).join(' · '),
-      searchTerms,
-      onSelect() {
-        open.value = false
-        router.push(path)
-      },
-    }
-  }
 
   return [
     ...(recentItems.length

@@ -179,14 +179,12 @@ const renderedHtml = computed(() => {
   <ToolPage name="markdown" max-width="6xl" icon="i-lucide-file-text">
     <div class="tool-workspace">
       <ToolSection :title="$t('tools.markdown.editorTitle')" :description="$t('tools.markdown.editorDesc')" :padding="false">
-        <div class="tool-command-bar m-4 justify-between">
-          <div class="flex flex-wrap items-center gap-2">
-            <UButton color="neutral" variant="ghost" class="rounded-full text-xs" icon="i-lucide-align-left" @click="formatMarkdown">{{ $t('app.format') }}</UButton>
-            <UButton color="neutral" variant="ghost" class="rounded-full text-xs" icon="i-lucide-file-plus" @click="insertTemplate">{{ $t('tools.markdown.template') }}</UButton>
-            <UButton color="neutral" variant="ghost" class="rounded-full text-xs" icon="i-lucide-eraser" @click="clearMarkdown">{{ $t('app.clear') }}</UButton>
-          </div>
+        <template #actions>
+          <UButton color="neutral" variant="soft" size="sm" class="rounded-full" icon="i-lucide-align-left" @click="formatMarkdown">{{ $t('app.format') }}</UButton>
+          <UButton color="neutral" variant="soft" size="sm" class="rounded-full" icon="i-lucide-file-plus" @click="insertTemplate">{{ $t('tools.markdown.template') }}</UButton>
+          <UButton color="neutral" variant="soft" size="sm" class="rounded-full" icon="i-lucide-eraser" @click="clearMarkdown">{{ $t('app.clear') }}</UButton>
           <CopyBtn :text="markdown" variant="button" />
-        </div>
+        </template>
         <div class="h-[560px] overflow-hidden rounded-b-[1.75rem]">
           <MonacoEditor v-model="markdown" language="markdown" :options="{ wordWrap: 'on', minimap: { enabled: false } }" />
         </div>

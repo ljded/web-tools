@@ -101,7 +101,6 @@ async function computeAes() {
   catch (e: any) { if (isCurrent()) { aesError.value = localizeCryptoMessage(e?.message, t('tools.crypto.operationFailedWithAlgo', { algo: 'AES' })); aesResult.value = '' } }
   finally { if (isCurrent()) aesLoading.value = false; lease.release() }
 }
-watch([aesText, aesKey, aesMode], () => { if (tab.value === 'aes') scheduleCompute('aes', computeAes) })
 
 // SM2
 const sm2Text = usePersistedRef('web-tools:crypto:sm2-text', 'Hello SM2')
@@ -131,7 +130,6 @@ async function computeSm2() {
   catch (e: any) { if (isCurrent()) { sm2Error.value = localizeCryptoMessage(e?.message, t('tools.crypto.operationFailedWithAlgo', { algo: 'SM2' })); sm2Result.value = '' } }
   finally { if (isCurrent()) sm2Loading.value = false; lease.release() }
 }
-watch([sm2Text, sm2Mode], () => { if (tab.value === 'sm2') scheduleCompute('sm2', computeSm2) })
 
 // RSA
 const rsaText = usePersistedRef('web-tools:crypto:rsa-text', 'Hello RSA')
@@ -161,7 +159,6 @@ async function computeRsa() {
   catch (e: any) { if (isCurrent()) { rsaError.value = localizeCryptoMessage(e?.message, t('tools.crypto.operationFailedWithAlgo', { algo: 'RSA' })); rsaResult.value = '' } }
   finally { if (isCurrent()) rsaLoading.value = false; lease.release() }
 }
-watch([rsaText, rsaMode], () => { if (tab.value === 'rsa') scheduleCompute('rsa', computeRsa) })
 
 // JWT
 const jwtText = usePersistedRef('web-tools:crypto:jwt-text', 'Hello JWT')
@@ -189,7 +186,6 @@ async function computeJwt() {
     finally { lease.release() }
   }
 }
-watch([jwtText, jwtSecret, jwtMode], () => { if (tab.value === 'jwt') scheduleCompute('jwt', computeJwt) })
 
 // Bcrypt
 const bcryptText = usePersistedRef('web-tools:crypto:bcrypt-text', 'MyPassword123')
@@ -243,7 +239,6 @@ async function computeSm4() {
   catch (e: any) { if (isCurrent()) { sm4Error.value = localizeCryptoMessage(e?.message, t('tools.crypto.operationFailedWithAlgo', { algo: 'SM4' })); sm4Result.value = '' } }
   finally { lease.release() }
 }
-watch([sm4Text, sm4Key, sm4Mode], () => { if (tab.value === 'sm4') scheduleCompute('sm4', computeSm4) })
 
 function computeActiveTab() {
   if (tab.value === 'aes') void computeAes()
@@ -253,7 +248,21 @@ function computeActiveTab() {
   else if (tab.value === 'jwt') void computeJwt()
 }
 
-watch(tab, () => computeActiveTab(), { immediate: true })
+// 优化：统一的 watcher 策略 - 只监听当前激活 tab 的相关字段
+watch(
+  () => [tab.value, aesText.value, aesKey.value, aesMode.value, sm2Text.value, sm2Mode.value,
+         rsaText.value, rsaMode.value, jwtText.value, jwtSecret.value, jwtMode.value,
+         sm4Text.value, sm4Key.value, sm4Mode.value],
+  () => {
+    // 根据当前 tab 调度对应的计算
+    if (tab.value === 'aes') scheduleCompute('aes', computeAes)
+    else if (tab.value === 'sm2') scheduleCompute('sm2', computeSm2)
+    else if (tab.value === 'rsa') scheduleCompute('rsa', computeRsa)
+    else if (tab.value === 'jwt') scheduleCompute('jwt', computeJwt)
+    else if (tab.value === 'sm4') scheduleCompute('sm4', computeSm4)
+  },
+  { immediate: true }
+)
 
 const tabsConfig = [
   { key: 'aes' as const, label: 'AES', icon: 'i-lucide-lock' },

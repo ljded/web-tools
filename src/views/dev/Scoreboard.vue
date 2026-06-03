@@ -58,6 +58,21 @@ function swapSides() {
     <div class="tool-workspace">
       <div class="space-y-4">
         <ToolSection :title="$t('tools.scoreboard.config')" :description="$t('tools.scoreboard.configDesc')">
+          <template #actions>
+            <CopyBtn :text="scoreText" />
+            <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-maximize-2" class="rounded-full" @click="fullscreen = true">
+              {{ $t('tools.scoreboard.fullscreen') }}
+            </UButton>
+            <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-refresh-cw" class="rounded-full" @click="resetScores">
+              {{ $t('tools.scoreboard.reset') }}
+            </UButton>
+            <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-arrow-left-right" class="rounded-full" @click="swapSides">
+              {{ $t('tools.scoreboard.swap') }}
+            </UButton>
+          </template>
+
+          <div class="mb-4 truncate font-mono text-sm text-default">{{ scoreText }}</div>
+
           <div class="space-y-5">
             <div class="tool-control-grid">
               <UFormField :label="$t('tools.scoreboard.leftName')">
@@ -75,22 +90,6 @@ function swapSides() {
               <UFormField :label="$t('tools.scoreboard.stepOptions')">
                 <UInput v-model="stepOptionsText" :placeholder="$t('tools.scoreboard.stepOptionsPlaceholder')" class="w-full" />
               </UFormField>
-            </div>
-
-            <div class="tool-command-bar justify-between">
-              <div class="truncate font-mono text-sm text-default">{{ scoreText }}</div>
-              <div class="flex flex-wrap gap-2">
-                <CopyBtn :text="scoreText" />
-                <UButton color="neutral" variant="ghost" icon="i-lucide-maximize-2" class="rounded-full" @click="fullscreen = true">
-                  {{ $t('tools.scoreboard.fullscreen') }}
-                </UButton>
-                <UButton color="neutral" variant="ghost" icon="i-lucide-refresh-cw" class="rounded-full" @click="resetScores">
-                  {{ $t('tools.scoreboard.reset') }}
-                </UButton>
-                <UButton color="neutral" variant="ghost" icon="i-lucide-arrow-left-right" class="rounded-full" @click="swapSides">
-                  {{ $t('tools.scoreboard.swap') }}
-                </UButton>
-              </div>
             </div>
           </div>
         </ToolSection>

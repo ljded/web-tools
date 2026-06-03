@@ -102,22 +102,20 @@ async function runCode() {
 <template>
   <ToolPage name="js-sandbox" max-width="6xl" icon="i-lucide-square-terminal">
     <ToolSection compact>
-      <div class="tool-command-bar justify-between">
-        <div class="flex flex-wrap items-center gap-2">
-          <UButton color="primary" class="rounded-full" icon="i-lucide-play" :loading="isRunning" @click="runCode">
-            {{ $t('tools.jsSandbox.run') }}
-          </UButton>
-          <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-align-left" @click="formatEditor(codeEditorRef)">
-            {{ $t('tools.jsSandbox.formatCode') }}
-          </UButton>
-          <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-braces" @click="formatInputJson">
-            {{ $t('tools.jsSandbox.formatInput') }}
-          </UButton>
-        </div>
-        <UButton color="neutral" variant="ghost" class="rounded-full" icon="i-lucide-eraser" @click="clearOutput">
+      <template #actions>
+        <UButton color="primary" variant="soft" size="sm" class="rounded-full" icon="i-lucide-play" :loading="isRunning" @click="runCode">
+          {{ $t('tools.jsSandbox.run') }}
+        </UButton>
+        <UButton color="neutral" variant="soft" size="sm" class="rounded-full" icon="i-lucide-align-left" @click="formatEditor(codeEditorRef)">
+          {{ $t('tools.jsSandbox.formatCode') }}
+        </UButton>
+        <UButton color="neutral" variant="soft" size="sm" class="rounded-full" icon="i-lucide-braces" @click="formatInputJson">
+          {{ $t('tools.jsSandbox.formatInput') }}
+        </UButton>
+        <UButton color="neutral" variant="soft" size="sm" class="rounded-full" icon="i-lucide-eraser" @click="clearOutput">
           {{ $t('tools.jsSandbox.clearOutput') }}
         </UButton>
-      </div>
+      </template>
     </ToolSection>
 
     <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(22rem,0.95fr)]">

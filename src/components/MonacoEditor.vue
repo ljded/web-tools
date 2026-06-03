@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import type * as Monaco from 'monaco-editor'
-import { useColorMode } from '@vueuse/core'
+import { useColorMode, useDebounceFn } from '@vueuse/core'
 import { applyChineseLocale } from '@/utils/monaco'
 
 const props = defineProps<{
@@ -27,6 +27,7 @@ let editorInstance: Monaco.editor.IStandaloneCodeEditor | Monaco.editor.IStandal
 let originalModel: Monaco.editor.ITextModel | null = null
 let modifiedModel: Monaco.editor.ITextModel | null = null
 let disposed = false
+let preventUpdateFromProps = false // 防止 props 更新时的循环触发
 const colorMode = useColorMode()
 
 function getTheme() {
@@ -43,19 +44,38 @@ onMounted(async () => {
     const diffEditor = monaco.editor.createDiffEditor(containerRef.value, {
       theme: getTheme(),
       automaticLayout: true,
-      renderSideBySide: true,
-      readOnly: props.readOnly ?? false,
+      renderSideBySide: true,         // 强制并排显示
+      renderIndicators: true,          // 显示差异指示器
+      enableSplitViewResizing: true,   // 允许调整分栏大小
+      ignoreTrimWhitespace: false,     // 不忽略空格差异
+      renderOverviewRuler: true,       // 显示概览标尺
+      scrollBeyondLastLine: false,
+      minimap: { enabled: true },      // 启用小地图
+      // 注意：不设置 readOnly，让左右两侧都可编辑
       ...((props.options as Monaco.editor.IStandaloneDiffEditorConstructionOptions) || {}),
     })
+
+    // 确保强制使用并排模式
+    if (diffEditor.updateOptions) {
+      diffEditor.updateOptions({
+        renderSideBySide: true,
+      })
+    }
 
     originalModel = monaco.editor.createModel(props.original || '', props.language || 'text')
     modifiedModel = monaco.editor.createModel(props.modified || '', props.language || 'text')
     diffEditor.setModel({ original: originalModel, modified: modifiedModel })
 
+    // 确保左侧编辑器可编辑
+    diffEditor.getOriginalEditor().updateOptions({ readOnly: false })
+    diffEditor.getModifiedEditor().updateOptions({ readOnly: false })
+
     diffEditor.getOriginalEditor().onDidChangeModelContent(() => {
+      if (preventUpdateFromProps) return
       emit('update:original', diffEditor.getOriginalEditor().getValue())
     })
     diffEditor.getModifiedEditor().onDidChangeModelContent(() => {
+      if (preventUpdateFromProps) return
       emit('update:modified', diffEditor.getModifiedEditor().getValue())
     })
     diffEditor.getOriginalEditor().onDidBlurEditorWidget(() => emit('blur'))
@@ -75,6 +95,7 @@ onMounted(async () => {
     })
 
     standaloneEditor.onDidChangeModelContent(() => {
+      if (preventUpdateFromProps) return
       emit('update:modelValue', standaloneEditor.getValue())
     })
     standaloneEditor.onDidBlurEditorWidget(() => emit('blur'))
@@ -90,36 +111,53 @@ watch(
   },
 )
 
+// 防抖更新编辑器值，避免快速输入时频繁调用 setValue
+const debouncedSetValue = useDebounceFn((editor: Monaco.editor.IStandaloneCodeEditor, value: string) => {
+  if (disposed || !editor) return
+  const currentValue = editor.getValue()
+  if (currentValue !== value) {
+    preventUpdateFromProps = true
+    const position = editor.getPosition()
+    const selection = editor.getSelection()
+    editor.setValue(value)
+    if (position) editor.setPosition(position)
+    if (selection) editor.setSelection(selection)
+    setTimeout(() => { preventUpdateFromProps = false }, 0)
+  }
+}, 100, { maxWait: 500 })
+
 watch(
   () => props.modelValue,
   (val) => {
     if (!editorInstance || props.diff) return
     const standalone = editorInstance as Monaco.editor.IStandaloneCodeEditor
-    if (standalone.getValue() !== val) {
-      standalone.setValue(val || '')
-    }
+    debouncedSetValue(standalone, val || '')
   },
 )
+
+// 防抖更新 Diff 编辑器模型
+const debouncedSetModelValue = useDebounceFn((model: Monaco.editor.ITextModel, value: string) => {
+  if (disposed || !model) return
+  if (model.getValue() !== value) {
+    preventUpdateFromProps = true
+    model.setValue(value)
+    setTimeout(() => { preventUpdateFromProps = false }, 0)
+  }
+}, 100, { maxWait: 500 })
 
 watch(
   () => props.original,
   (val) => {
-    if (!editorInstance || !props.diff) return
-    const model = originalModel
-    if (model && model.getValue() !== val) {
-      model.setValue(val || '')
-    }
+    if (!editorInstance || !props.diff || !originalModel) return
+    debouncedSetModelValue(originalModel, val || '')
   },
 )
 
 watch(
   () => props.modified,
   (val) => {
-    if (!editorInstance || !props.diff) return
-    const model = modifiedModel
-    if (model && model.getValue() !== val) {
-      model.setValue(val || '')
-    }
+    if (!editorInstance || !props.diff || !modifiedModel) return
+    debouncedSetModelValue(modifiedModel, val || '')
   },
 )
 

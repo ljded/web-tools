@@ -14,6 +14,9 @@
 - 历史与收藏：支持 Recent/Favorite 工具入口，使用 localStorage 持久化偏好。
 - 历史记录：工具历史使用 IndexedDB 持久化，避免 localStorage 容量限制。
 - Worker 计算池：哈希、加密、密钥生成等重任务通过 Worker 执行，降低主线程阻塞。
+- 性能监控：开发环境下支持 Web Vitals 指标本地采集和分析（仅控制台输出，不上传数据）。
+- 智能优化：搜索索引 LRU 缓存、防抖计算支持 AbortController、深度比较优化、空闲时间调度。
+- 完善测试：为核心模块提供单元测试覆盖，确保代码质量和稳定性。
 
 ## 工具清单
 
@@ -105,21 +108,40 @@ src/
       ToolSection.vue     # 输入、输出、预览等工具区块统一包装
       ToolActions.vue     # 复制、下载、清空等动作组布局
   composables/            # 共享组合式逻辑
+    __tests__/            # composables 单元测试
   i18n/                   # 业务国际化配置
   router/                 # 路由入口
   stores/                 # Pinia store
+  test/                   # 测试工具和配置
   tools/
+    __tests__/            # tools 单元测试
     registry.ts           # 工具注册表，驱动路由和工具元数据
     navigation.ts         # 从 registry 派生侧边栏、标题和导航 items
-    search.ts             # 从 registry 派生首页搜索和命令面板索引
+    search.ts             # 从 registry 派生首页搜索和命令面板索引（支持 LRU 缓存）
     preload.ts            # 空闲时间预加载工具 chunk
   utils/                  # IndexedDB、历史、持久化、剪贴板等工具
+    __tests__/            # utils 单元测试
+    performance.ts        # 性能监控工具（Web Vitals 指标采集）
+    error.ts              # 统一错误处理工具
+    deepEqual.ts          # 深度相等比较（替代 JSON 序列化）
+    scheduler.ts          # 空闲时间任务调度
+    stream.ts             # 流式处理工具
+    search-index.ts       # 搜索索引工具
+    benchmark.ts          # 性能基准测试工具
   views/
+    __tests__/            # views 单元测试
     crypto/               # 加密安全类工具
     dev/                  # 开发类工具
     media/                # 媒体类工具
     text/                 # 文本类工具
   workers/                # Worker 和 Worker pool
+scripts/
+  analyze-bundle.js       # 打包分析脚本
+  analyze-profile.js      # 性能分析脚本
+  analyze-firefox-profile.js  # Firefox 性能分析
+  quick-profile-stats.js  # 快速性能统计
+  stream-profile-analyzer.js  # 流式性能分析
+  benchmark.ts            # 基准测试脚本
 ```
 
 ## 快速修改指南（建议先看）
@@ -256,10 +278,12 @@ npm run build
 其他命令：
 
 ```bash
-npm run check-i18n
-npm run format
-npm run test:watch
-npm run test:e2e
+npm run check-i18n       # 检查国际化文件
+npm run format           # 格式化代码
+npm run test:watch       # 监听模式运行测试
+npm run test:coverage    # 生成测试覆盖率报告
+npm run test:e2e         # 运行端到端测试
+npm run analyze          # 分析打包体积
 ```
 
 `npm run build` 会先执行 `vue-tsc --build`，再运行 Vite 生产构建。
@@ -283,6 +307,38 @@ npm run test:e2e
 | `vendor-monaco` | Monaco Editor |
 
 构建时 Monaco、PDF worker 和媒体处理相关 chunk 可能超过 Vite 默认大小阈值，这是当前功能体积带来的预期警告。
+
+## 性能优化
+
+v0.2.3 版本重点优化了应用性能：
+
+### 性能监控
+- 集成 `performance.ts` 性能监控工具
+- 支持 Web Vitals 指标本地采集（LCP、FCP、FID、CLS、INP）
+- 开发环境定期在控制台输出性能报告（不上传数据）
+- 路由切换性能追踪
+
+### 搜索优化
+- 工具搜索实现 LRU 缓存机制（最大 50 条，TTL 5 分钟）
+- 预处理查询上下文，避免重复计算
+- 优化评分算法，减少不必要的字符串操作
+
+### 数据处理优化
+- 新增 `deepEqual.ts` 深度比较工具，替代 JSON 序列化
+- `persist.ts` 防抖写入机制（100ms 延迟）
+- `history.ts` 使用空闲时间调度，降低主线程压力
+- `useDebouncedCompute` 支持 AbortController，自动取消过期操作
+
+### 性能分析工具
+项目提供多个性能分析脚本：
+
+```bash
+node scripts/analyze-bundle.js              # 打包体积分析
+node scripts/analyze-profile.js             # Chrome 性能分析
+node scripts/analyze-firefox-profile.js     # Firefox 性能分析
+node scripts/quick-profile-stats.js         # 快速统计
+node scripts/stream-profile-analyzer.js     # 流式分析
+```
 
 ## 新增工具流程
 
