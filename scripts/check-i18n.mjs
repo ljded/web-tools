@@ -19,18 +19,23 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(__dirname, '..')
 const SRC = resolve(ROOT, 'src')
 const LOCALE_DIR = resolve(SRC, 'i18n', 'locales')
+const showAllUnused = process.argv.includes('--all-unused')
 
-// 收集所有 .vue 文件
-function collectVueFiles(dir) {
+// 收集需要参与 key 提取的源码文件，排除 locale 自身，避免把声明误判为使用
+function collectSourceFiles(dir) {
   const result = []
   const entries = readdirSync(dir, { withFileTypes: true })
   for (const entry of entries) {
     const full = resolve(dir, entry.name)
     if (entry.isDirectory()) {
-      if (!['node_modules', '.git', 'dist', 'workers'].includes(entry.name)) {
-        result.push(...collectVueFiles(full))
+      const relativeDir = full.replace(/\\/g, '/')
+      if (
+        !['node_modules', '.git', 'dist', 'workers'].includes(entry.name) &&
+        !relativeDir.endsWith('/src/i18n/locales')
+      ) {
+        result.push(...collectSourceFiles(full))
       }
-    } else if (entry.name.endsWith('.vue')) {
+    } else if (entry.name.endsWith('.vue') || entry.name.endsWith('.ts')) {
       result.push(full)
     }
   }
@@ -51,23 +56,67 @@ function flattenKeys(obj, prefix = '') {
   return result
 }
 
-// 从 Vue 文件中提取 t('xxx') 和 i18nKey 引用
-function extractI18nKeys(content) {
+// 从源码中提取 t('xxx')、$t('xxx')、i18nKey 和 labelKey 引用
+function extractI18nUsage(content) {
   const keys = new Set()
+  const dynamicPrefixes = new Set()
+  const toolPrefixes = new Set()
   // t('key') or t("key")
-  const tRegex = /\bt\s*\(\s*['"`]([^'"`]+)['"`]/g
-  // i18nKey: 'xxx' (in registry)
-  const keyRegex = /i18nKey\s*:\s*['"`]([^'"`]+)['"`]/g
-  // t(`${prefix}.${xxx}`) — skip template literals
-  // $t('key')
-  const dtRegex = /\$t\s*\(\s*['"`]([^'"`]+)['"`]/g
+  const tRegex = /\b(?:t|\$t)\s*\(\s*['"`]([^'"`$]+)['"`]/g
+  // i18nKey: 'xxx' and labelKey: 'xxx' in registry/config files
+  const keyRegex = /\b(?:i18nKey|labelKey)\s*:\s*['"`]([^'"`]+)['"`]/g
+  // t(`app.badges.${name}`) style dynamic prefixes
+  const dynamicPrefixRegex = /\b(?:t|\$t)\s*\(\s*`([^`$]+)\$\{/g
+  // domainI18nKeys maps domain names to nav group keys used indirectly
+  const domainKeyRegex = /:\s*['"`](nav\.groups\.[^'"`]+)['"`]/g
 
   let m
   while ((m = tRegex.exec(content))) keys.add(m[1])
-  while ((m = keyRegex.exec(content))) keys.add(m[1])
-  while ((m = dtRegex.exec(content))) keys.add(m[1])
+  while ((m = keyRegex.exec(content))) {
+    keys.add(m[1])
+    if (m[1].startsWith('tools.')) toolPrefixes.add(m[1])
+  }
+  while ((m = dynamicPrefixRegex.exec(content))) dynamicPrefixes.add(m[1].replace(/\.$/, ''))
+  while ((m = domainKeyRegex.exec(content))) keys.add(m[1])
 
-  return keys
+  return { keys, dynamicPrefixes, toolPrefixes }
+}
+
+function stripLineCommentOutsideStrings(line) {
+  let quote = ''
+  let escaped = false
+  for (let i = 0; i < line.length - 1; i++) {
+    const ch = line[i]
+    const next = line[i + 1]
+
+    if (escaped) {
+      escaped = false
+      continue
+    }
+
+    if (quote) {
+      if (ch === '\\') {
+        escaped = true
+      } else if (ch === quote) {
+        quote = ''
+      }
+      continue
+    }
+
+    if (ch === '\'' || ch === '"' || ch === '`') {
+      quote = ch
+      continue
+    }
+
+    if (ch === '/' && next === '/') {
+      return line.slice(0, i)
+    }
+  }
+  return line
+}
+
+function normalizeLineForChineseCheck(line) {
+  return stripLineCommentOutsideStrings(line).replace(/<!--.*?-->/g, '').replace(/\/\*.*?\*\//g, '')
 }
 
 // 检测硬编码的中文字符串（在 template 文本节点和属性中）
@@ -76,9 +125,9 @@ function findHardcodedChinese(content) {
   // 匹配 Vue template 中的纯文本节点（中文字符 ≥2）
   const lines = content.split('\n')
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
+    const line = normalizeLineForChineseCheck(lines[i])
     // 跳过注释、import、export、console、script setup 标签行
-    if (/^\s*\/\//.test(line) || /^\s*\*/.test(line) || /import\s/.test(line) || /export\s/.test(line)) continue
+    if (/^\s*$/.test(line) || /^\s*\/\//.test(line) || /^\s*\*/.test(line) || /^\s*<!--/.test(line) || /import\s/.test(line) || /export\s/.test(line)) continue
     // 检测中文文本（不在 t() 或 $t() 调用中）
     const chinesePattern = /[\u4e00-\u9fff]{2,}[^\u4e00-\u9fff`'"()]*/g
     let m
@@ -106,8 +155,9 @@ function findHardcodedChinese(content) {
 function main() {
   console.log('🔍 i18n 覆盖率检查\n')
 
-  const vueFiles = collectVueFiles(SRC)
-  console.log(`找到 ${vueFiles.length} 个 Vue 文件\n`)
+  const sourceFiles = collectSourceFiles(SRC)
+  const vueFiles = sourceFiles.filter((file) => file.endsWith('.vue'))
+  console.log(`找到 ${sourceFiles.length} 个源码文件，其中 ${vueFiles.length} 个 Vue 文件\n`)
 
   // 加载 locale 文件
   let zhCN, enUS
@@ -129,24 +179,30 @@ function main() {
 
   // 汇总所有 Vue 文件中使用的 key
   const usedKeys = new Set()
-  const referencedI18nKeys = new Set() // registry 中的 i18nKey
+  const dynamicPrefixes = new Set()
+  const toolPrefixes = new Set()
   const hardcodedIssues = []
 
-  for (const file of vueFiles) {
+  for (const file of sourceFiles) {
     const content = readFileSync(file, 'utf-8')
-    const keys = extractI18nKeys(content)
+    const usage = extractI18nUsage(content)
+    const keys = usage.keys
     for (const k of keys) usedKeys.add(k)
+    for (const prefix of usage.dynamicPrefixes) dynamicPrefixes.add(prefix)
+    for (const prefix of usage.toolPrefixes) toolPrefixes.add(prefix)
 
-    // 检测 registry 中的工具级 i18nKey
-    if (file.includes('registry')) {
-      for (const k of keys) referencedI18nKeys.add(k)
+    if (file.endsWith('.vue')) {
+      const issues = findHardcodedChinese(content)
+      for (const issue of issues) {
+        issue.file = file.replace(ROOT, '')
+        hardcodedIssues.push(issue)
+      }
     }
+  }
 
-    const issues = findHardcodedChinese(content)
-    for (const issue of issues) {
-      issue.file = file.replace(ROOT, '')
-      hardcodedIssues.push(issue)
-    }
+  for (const prefix of toolPrefixes) {
+    usedKeys.add(`${prefix}.title`)
+    usedKeys.add(`${prefix}.desc`)
   }
 
   let errors = 0
@@ -185,13 +241,15 @@ function main() {
 
   // 3. 检测未使用的 key
   console.log('\n═══ 已声明但未使用的 key（可能为死代码）═══')
-  const unusedZH = [...zhKeys].filter(k => !usedKeys.has(k) && !referencedI18nKeys.has(k) && k.split('.').length <= 3)
-  for (const k of unusedZH.slice(0, 20)) {
+  const isUsedByDynamicPrefix = (key) => [...dynamicPrefixes].some((prefix) => key.startsWith(`${prefix}.`))
+  const unusedZH = [...zhKeys].filter(k => !usedKeys.has(k) && !isUsedByDynamicPrefix(k) && k.split('.').length <= 3)
+  const unusedToShow = showAllUnused ? unusedZH : unusedZH.slice(0, 20)
+  for (const k of unusedToShow) {
     console.log(`  💤 unused: "${k}"`)
     warnings++
   }
   if (!unusedZH.length) console.log('  ✅ 无未使用的 key')
-  else if (unusedZH.length > 20) console.log(`  ... 共 ${unusedZH.length} 个未使用 key（仅展示前 20 个）`)
+  else if (!showAllUnused && unusedZH.length > 20) console.log(`  ... 共 ${unusedZH.length} 个未使用 key（仅展示前 20 个）`)
 
   // 4. 检测硬编码中文
   console.log(`\n═══ 硬编码中文检测（${hardcodedIssues.length} 处）═══`)

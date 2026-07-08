@@ -39,7 +39,7 @@ describe('URL 工具逻辑', () => {
     it('应正确编码路径分隔符', () => {
       const text = 'path/to/file'
       const encoded = encodeURIComponent(text)
-      expect(encoded).toBe('path%2Fto%2Efile')
+      expect(encoded).toBe('path%2Fto%2Ffile')
     })
 
     it('应正确编码 emoji', () => {

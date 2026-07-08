@@ -81,6 +81,20 @@ describe('Search Performance Benchmarks', () => {
     expect(avgTime).toBeLessThan(10)
   })
 
+  it('空查询不应构建功能项搜索目录', () => {
+    const translatedKeys: string[] = []
+    const trackingTranslate = (key: string) => {
+      translatedKeys.push(key)
+      return key
+    }
+
+    searchTools(trackingTranslate, '', { cacheKey: 'empty-feature-lazy' })
+    expect(translatedKeys).not.toContain('tools.crypto.aes')
+
+    searchTools(trackingTranslate, 'aes', { cacheKey: 'non-empty-feature-lazy' })
+    expect(translatedKeys).toContain('tools.crypto.aes')
+  })
+
   it('多关键词搜索应在 50ms 内完成', () => {
     const avgTime = measureAvgTime(() => {
       searchTools(mockTranslate, 'json editor', { cacheKey: 'zh-CN' })

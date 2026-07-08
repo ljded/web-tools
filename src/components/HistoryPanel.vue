@@ -115,7 +115,7 @@ if (typeof window !== 'undefined') {
               class="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-error transition-colors hover:bg-error/5"
               @click="emit('clear')"
             >
-              <UIcon name="i-lucide-trash2" class="size-3" />
+              <UIcon name="i-lucide-trash-2" class="size-3" />
               {{ t('app.clear') }}
             </UButton>
             <UButton

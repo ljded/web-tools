@@ -25,10 +25,9 @@ describe('useHistory', () => {
 
   it('应正确初始化历史记录', () => {
     const { result } = withSetup(() =>
-      useHistory({
-        storageKey: 'test-history',
+      useHistory<{ data: string }>('test-history-composable-init', {
         maxCount: 10,
-      })
+      }),
     )
 
     expect(result.items.value).toEqual([])
@@ -36,11 +35,12 @@ describe('useHistory', () => {
 
   it('应能添加历史记录', async () => {
     const { result } = withSetup(() =>
-      useHistory<{ data: string }>({
-        storageKey: 'test-history-add',
+      useHistory<{ data: string }>('test-history-composable-add', {
         maxCount: 10,
-      })
+        debounceMs: 0,
+      }),
     )
+    await result.ready
 
     await result.add({ data: 'item 1' })
 
@@ -49,11 +49,12 @@ describe('useHistory', () => {
 
   it('应能删除历史记录', async () => {
     const { result } = withSetup(() =>
-      useHistory<{ data: string }>({
-        storageKey: 'test-history-delete',
+      useHistory<{ data: string }>('test-history-composable-delete', {
         maxCount: 10,
-      })
+        debounceMs: 0,
+      }),
     )
+    await result.ready
 
     await result.add({ data: 'item 1' })
     const items = result.items.value
@@ -66,11 +67,12 @@ describe('useHistory', () => {
 
   it('应能清空所有历史记录', async () => {
     const { result } = withSetup(() =>
-      useHistory<{ data: string }>({
-        storageKey: 'test-history-clear',
+      useHistory<{ data: string }>('test-history-composable-clear', {
         maxCount: 10,
-      })
+        debounceMs: 0,
+      }),
     )
+    await result.ready
 
     await result.add({ data: 'item 1' })
     await result.add({ data: 'item 2' })
@@ -83,11 +85,12 @@ describe('useHistory', () => {
     const maxCount = 3
 
     const { result } = withSetup(() =>
-      useHistory<{ data: string }>({
-        storageKey: 'test-history-max',
+      useHistory<{ data: string }>('test-history-composable-max', {
         maxCount,
-      })
+        debounceMs: 0,
+      }),
     )
+    await result.ready
 
     // 添加超过限制的记录
     await result.add({ data: 'item 1' })
@@ -106,11 +109,12 @@ describe('useHistory', () => {
     }
 
     const { result } = withSetup(() =>
-      useHistory<CustomData>({
-        storageKey: 'test-history-types',
+      useHistory<CustomData>('test-history-composable-types', {
         maxCount: 10,
-      })
+        debounceMs: 0,
+      }),
     )
+    await result.ready
 
     const data: CustomData = {
       text: 'hello',
@@ -122,19 +126,20 @@ describe('useHistory', () => {
 
     const items = result.items.value
     if (items.length > 0) {
-      expect(items[0].text).toBe('hello')
-      expect(items[0].number).toBe(42)
-      expect(items[0].boolean).toBe(true)
+      expect(items[0]?.data.text).toBe('hello')
+      expect(items[0]?.data.number).toBe(42)
+      expect(items[0]?.data.boolean).toBe(true)
     }
   })
 
   it('应按时间倒序排列记录', async () => {
     const { result } = withSetup(() =>
-      useHistory<{ data: string }>({
-        storageKey: 'test-history-order',
+      useHistory<{ data: string }>('test-history-composable-order', {
         maxCount: 10,
-      })
+        debounceMs: 0,
+      }),
     )
+    await result.ready
 
     await result.add({ data: 'first' })
     await new Promise((resolve) => setTimeout(resolve, 10))
@@ -143,8 +148,8 @@ describe('useHistory', () => {
     const items = result.items.value
     if (items.length >= 2) {
       // 最新的应该在前面
-      expect(items[0].data).toBe('second')
-      expect(items[1].data).toBe('first')
+      expect(items[0]?.data.data).toBe('second')
+      expect(items[1]?.data.data).toBe('first')
     }
   })
 })

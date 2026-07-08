@@ -3,6 +3,7 @@ import {
   fileToBase64Stream,
   base64ToBlob,
   arrayBufferToBase64,
+  computeFileHashStream,
   shouldUseStreaming,
   estimateMemoryUsage,
 } from '../stream'
@@ -105,10 +106,23 @@ describe('stream utilities', () => {
       const file = new File([blob], 'test.txt', { type: 'text/plain' })
 
       const progressCallback = vi.fn()
-      const base64 = await fileToBase64Stream(file, progressCallback)
+      const base64 = await fileToBase64Stream(file, progressCallback, 1)
 
       expect(base64).toBe(btoa(text))
       expect(progressCallback).toHaveBeenCalled()
+    })
+  })
+
+  describe('computeFileHashStream', () => {
+    it('should hash the whole file instead of concatenating chunk hashes', async () => {
+      const text = 'Hello, World!'
+      const file = new File([text], 'test.txt', { type: 'text/plain' })
+      const expectedBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+      const expected = Array.from(new Uint8Array(expectedBuffer))
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('')
+
+      await expect(computeFileHashStream(file, 'SHA-256', vi.fn())).resolves.toBe(expected)
     })
   })
 })

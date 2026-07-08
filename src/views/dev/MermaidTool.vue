@@ -25,6 +25,8 @@ const renderError = ref('')
 const rendering = ref(false)
 let renderTimer: ReturnType<typeof setTimeout> | null = null
 let renderSeq = 0
+let mermaidPromise: Promise<typeof import('mermaid').default> | null = null
+let initializedTheme: 'dark' | 'default' | null = null
 
 const previewMeta = computed(() => [
   { label: t('tools.mermaid.metaLines'), value: diagram.value.split(/\r?\n/).length },
@@ -58,6 +60,20 @@ function downloadSvg() {
   downloadText(renderedSvg.value, 'diagram.svg', 'image/svg+xml;charset=utf-8')
 }
 
+async function loadMermaid(theme: 'dark' | 'default') {
+  mermaidPromise ??= import('mermaid').then((mod) => mod.default)
+  const mermaid = await mermaidPromise
+  if (initializedTheme !== theme) {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme,
+    })
+    initializedTheme = theme
+  }
+  return mermaid
+}
+
 async function renderDiagram() {
   const source = diagram.value.trim()
   const seq = ++renderSeq
@@ -71,12 +87,7 @@ async function renderDiagram() {
   rendering.value = true
   renderError.value = ''
   try {
-    const { default: mermaid } = await import('mermaid')
-    mermaid.initialize({
-      startOnLoad: false,
-      securityLevel: 'strict',
-      theme: colorMode.value === 'dark' ? 'dark' : 'default',
-    })
+    const mermaid = await loadMermaid(colorMode.value === 'dark' ? 'dark' : 'default')
     await mermaid.parse(source)
     const { svg } = await mermaid.render(`web-tools-mermaid-${Date.now()}-${seq}`, source)
     if (seq === renderSeq) renderedSvg.value = svg

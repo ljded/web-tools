@@ -1,4 +1,10 @@
-import { getToolFeaturePath, tools, type ToolCapability, type ToolDefinition, type ToolFeatureDefinition } from '@/tools/registry'
+import {
+  getToolFeaturePath,
+  tools,
+  type ToolCapability,
+  type ToolDefinition,
+  type ToolFeatureDefinition,
+} from '@/tools/registry'
 import type { Translate } from '@/tools/navigation'
 
 export interface ToolSearchItem {
@@ -31,7 +37,7 @@ interface SearchContext extends TokenSearchContext {
 
 interface ToolSearchCatalog {
   rootItems: ToolSearchItem[]
-  featureItems: ToolSearchItem[]
+  featureItems?: ToolSearchItem[]
 }
 
 // 优化：添加 LRU 缓存和 TTL
@@ -53,7 +59,9 @@ function compact(value: string) {
 }
 
 function tokenize(value: string) {
-  return normalize(value).split(/[\s,，、\/\\|]+/).filter(Boolean)
+  return normalize(value)
+    .split(/[\s,，、\/\\|]+/)
+    .filter(Boolean)
 }
 
 function prepareQuery(query: string): SearchContext {
@@ -72,20 +80,34 @@ function prepareQuery(query: string): SearchContext {
   }
 }
 
-function scoreText(field: string, context: TokenSearchContext, exactScore: number, startsWithScore: number, includesScore: number) {
+function scoreText(
+  field: string,
+  context: TokenSearchContext,
+  exactScore: number,
+  startsWithScore: number,
+  includesScore: number,
+) {
   if (!context.normalized) return 0
 
   const normalized = normalize(field)
   const compactField = compact(field)
   if (normalized === context.normalized || compactField === context.compact) return exactScore
   if (normalized.startsWith(context.normalized)) return startsWithScore
-  if (context.compact && compactField.startsWith(context.compact)) return Math.round(startsWithScore * 0.92)
+  if (context.compact && compactField.startsWith(context.compact))
+    return Math.round(startsWithScore * 0.92)
   if (normalized.includes(context.normalized)) return includesScore
-  if (context.compact && compactField.includes(context.compact)) return Math.round(includesScore * 0.85)
+  if (context.compact && compactField.includes(context.compact))
+    return Math.round(includesScore * 0.85)
   return 0
 }
 
-function createSearchText(tool: ToolDefinition, label: string, description: string, feature?: ToolFeatureDefinition, featureLabel = '') {
+function createSearchText(
+  tool: ToolDefinition,
+  label: string,
+  description: string,
+  feature?: ToolFeatureDefinition,
+  featureLabel = '',
+) {
   return [
     tool.name,
     label,
@@ -103,24 +125,42 @@ function createSearchText(tool: ToolDefinition, label: string, description: stri
     .toLocaleLowerCase()
 }
 
-function scoreToolText(tool: ToolDefinition, label: string, description: string, context: TokenSearchContext) {
+function scoreToolText(
+  tool: ToolDefinition,
+  label: string,
+  description: string,
+  context: TokenSearchContext,
+) {
   let score = 0
   score += scoreText(tool.name, context, 120, 90, 55)
   score += scoreText(label, context, 110, 85, 50)
   score += scoreText(description, context, 40, 30, 18)
-  score += (tool.keywords ?? []).reduce((total, keyword) => total + scoreText(keyword, context, 75, 55, 35), 0)
+  score += (tool.keywords ?? []).reduce(
+    (total, keyword) => total + scoreText(keyword, context, 75, 55, 35),
+    0,
+  )
   score += (tool.tags ?? []).reduce((total, tag) => total + scoreText(tag, context, 38, 28, 18), 0)
-  score += (tool.capabilities ?? []).reduce((total, capability) => total + scoreText(capability, context, 28, 18, 12), 0)
+  score += (tool.capabilities ?? []).reduce(
+    (total, capability) => total + scoreText(capability, context, 28, 18, 12),
+    0,
+  )
   score += scoreText(tool.domain, context, 20, 12, 8)
   score += scoreText(tool.status ?? '', context, 16, 12, 8)
   score += scoreText(tool.hotkey ?? '', context, 16, 12, 8)
   return score
 }
 
-function scoreFeatureText(feature: ToolFeatureDefinition | undefined, featureLabel: string, context: TokenSearchContext) {
+function scoreFeatureText(
+  feature: ToolFeatureDefinition | undefined,
+  featureLabel: string,
+  context: TokenSearchContext,
+) {
   if (!feature) return 0
   let score = scoreText(featureLabel, context, 125, 98, 68)
-  score += (feature.keywords ?? []).reduce((total, keyword) => total + scoreText(keyword, context, 92, 70, 45), 0)
+  score += (feature.keywords ?? []).reduce(
+    (total, keyword) => total + scoreText(keyword, context, 92, 70, 45),
+    0,
+  )
   return score
 }
 
@@ -130,15 +170,20 @@ function scoreItem(item: ToolSearchItem, context: SearchContext, options: ToolSe
   let score = scoreToolText(item.tool, item.label, item.description, context) + directFeatureScore
 
   if (context.tokenContexts.length > 1) {
-    const tokenScores = context.tokenContexts.map((tokenContext) =>
-      scoreToolText(item.tool, item.label, item.description, tokenContext) + scoreFeatureText(item.feature, featureLabel, tokenContext),
+    const tokenScores = context.tokenContexts.map(
+      (tokenContext) =>
+        scoreToolText(item.tool, item.label, item.description, tokenContext) +
+        scoreFeatureText(item.feature, featureLabel, tokenContext),
     )
     if (tokenScores.some((tokenScore) => tokenScore <= 0)) return 0
     score += Math.round(tokenScores.reduce((total, tokenScore) => total + tokenScore, 0) * 0.6)
   }
 
   if (item.feature) {
-    const tokenFeatureScore = context.tokenContexts.reduce((total, tokenContext) => total + scoreFeatureText(item.feature, featureLabel, tokenContext), 0)
+    const tokenFeatureScore = context.tokenContexts.reduce(
+      (total, tokenContext) => total + scoreFeatureText(item.feature, featureLabel, tokenContext),
+      0,
+    )
     if (context.normalized && directFeatureScore <= 0 && tokenFeatureScore <= 0) return 0
     score += 28
   }
@@ -165,7 +210,9 @@ function scoreItems(items: ToolSearchItem[], context: SearchContext, options: To
       ...item,
       score: scoreItem(item, context, options),
     }))
-    .filter((item) => item.score > 0 || (!item.feature && item.searchText.includes(context.normalized)))
+    .filter(
+      (item) => item.score > 0 || (!item.feature && item.searchText.includes(context.normalized)),
+    )
     .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label))
 }
 
@@ -228,21 +275,31 @@ function getSearchCatalog(t: Translate, cacheKey = 'default'): ToolSearchCatalog
     if (oldestKey) catalogCache.delete(oldestKey)
   }
 
-  const rootItems = tools.map((tool) => createRootItem(t, tool))
-  const featureItems = tools.flatMap((tool) => createFeatureItems(t, tool))
-  const catalog = { rootItems, featureItems }
+  const catalog = { rootItems: tools.map((tool) => createRootItem(t, tool)) }
   catalogCache.set(cacheKey, { catalog, timestamp: Date.now() })
   return catalog
 }
 
-export function createToolSearchItems(t: Translate, options: ToolSearchOptions = {}): ToolSearchItem[] {
+function getFeatureSearchItems(t: Translate, catalog: ToolSearchCatalog): ToolSearchItem[] {
+  catalog.featureItems ??= tools.flatMap((tool) => createFeatureItems(t, tool))
+  return catalog.featureItems
+}
+
+export function createToolSearchItems(
+  t: Translate,
+  options: ToolSearchOptions = {},
+): ToolSearchItem[] {
   return scoreItems(getSearchCatalog(t, options.cacheKey).rootItems, prepareQuery(''), options)
 }
 
-export function searchTools(t: Translate, query: string, options: ToolSearchOptions = {}): ToolSearchItem[] {
+export function searchTools(
+  t: Translate,
+  query: string,
+  options: ToolSearchOptions = {},
+): ToolSearchItem[] {
   const context = prepareQuery(query)
   const catalog = getSearchCatalog(t, options.cacheKey)
   if (!context.normalized) return scoreItems(catalog.rootItems, context, options)
 
-  return scoreItems([...catalog.rootItems, ...catalog.featureItems], context, options)
+  return scoreItems([...catalog.rootItems, ...getFeatureSearchItems(t, catalog)], context, options)
 }

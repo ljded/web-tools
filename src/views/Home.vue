@@ -217,7 +217,7 @@ async function downloadOfflineTool(name: string) {
 
   downloadingToolName.value = name
   try {
-    const result = await preloadToolByNameNow(name)
+    const result = await preloadToolByNameNow(name, { includeAssets: true })
     refreshDownloadedTools()
     toast.add({
       title: result === 'failed' ? t('app.offlineDownload.downloadFailed') : t('app.offlineDownload.toolReady', { name: tool.label }),
@@ -243,7 +243,7 @@ async function downloadOfflineTools(names: string[], emptyMessage: string) {
 
   downloadingOfflineTools.value = true
   try {
-    const { loaded, failed, skipped, failedNames } = await preloadToolsByNamesInBackground(names, names.length)
+    const { loaded, failed, skipped, failedNames } = await preloadToolsByNamesInBackground(names, names.length, { includeAssets: true })
     failedOfflineToolNames.value = failedNames
     refreshDownloadedTools()
     const failedText = failedNames.length

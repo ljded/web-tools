@@ -3,6 +3,10 @@
  * 用于替代 JSON.stringify 比较，性能更好
  */
 export function deepEqual(a: any, b: any, maxDepth = 10): boolean {
+  return deepEqualInternal(a, b, maxDepth, new WeakMap<object, WeakSet<object>>())
+}
+
+function deepEqualInternal(a: any, b: any, maxDepth: number, seen: WeakMap<object, WeakSet<object>>): boolean {
   // 深度限制，防止栈溢出
   if (maxDepth === 0) return a === b
 
@@ -15,6 +19,11 @@ export function deepEqual(a: any, b: any, maxDepth = 10): boolean {
 
   // 非对象类型
   if (typeof a !== 'object') return a === b
+
+  const matched = seen.get(a)
+  if (matched?.has(b)) return true
+  if (matched) matched.add(b)
+  else seen.set(a, new WeakSet([b]))
 
   // 日期类型
   if (a instanceof Date && b instanceof Date) {
@@ -31,7 +40,7 @@ export function deepEqual(a: any, b: any, maxDepth = 10): boolean {
     if (!Array.isArray(b)) return false
     if (a.length !== b.length) return false
     for (let i = 0; i < a.length; i++) {
-      if (!deepEqual(a[i], b[i], maxDepth - 1)) return false
+      if (!deepEqualInternal(a[i], b[i], maxDepth - 1, seen)) return false
     }
     return true
   }
@@ -44,7 +53,7 @@ export function deepEqual(a: any, b: any, maxDepth = 10): boolean {
 
   for (const key of keysA) {
     if (!Object.prototype.hasOwnProperty.call(b, key)) return false
-    if (!deepEqual(a[key], b[key], maxDepth - 1)) return false
+    if (!deepEqualInternal(a[key], b[key], maxDepth - 1, seen)) return false
   }
 
   return true

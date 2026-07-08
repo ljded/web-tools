@@ -1,7 +1,7 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { addCollection } from '@iconify/vue'
-import lucideIcons from '@iconify-json/lucide/icons.json'
+import lucideIcons from 'virtual:used-lucide-icons'
 
 import App from './App.vue'
 import router from './router'

@@ -282,7 +282,7 @@ const currentFileStatus = computed(() => {
                 <div class="flex shrink-0 gap-1">
                   <UButton color="neutral" variant="ghost" icon="i-lucide-chevron-up" size="xs" @click="moveMergeFile(i, -1)" :disabled="i === 0" class="rounded-full" :aria-label="$t('tools.pdf.moveUp', { name: item.name })" />
                   <UButton color="neutral" variant="ghost" icon="i-lucide-chevron-down" size="xs" @click="moveMergeFile(i, 1)" :disabled="i === mergeFiles.length - 1" class="rounded-full" :aria-label="$t('tools.pdf.moveDown', { name: item.name })" />
-                  <UButton color="neutral" variant="ghost" icon="i-lucide-trash2" size="xs" @click="removeMergeFile(i)" class="rounded-full" :aria-label="$t('tools.pdf.removeFile', { name: item.name })" />
+                  <UButton color="neutral" variant="ghost" icon="i-lucide-trash-2" size="xs" @click="removeMergeFile(i)" class="rounded-full" :aria-label="$t('tools.pdf.removeFile', { name: item.name })" />
                 </div>
               </div>
             </div>

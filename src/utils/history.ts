@@ -78,7 +78,7 @@ export function useHistory<T extends Record<string, unknown>>(
         const parsed = safeParseJSON<HistoryItem<T>[]>(legacy)
         if (parsed && Array.isArray(parsed)) {
           items.value = parsed
-          await save()
+          await putHistoryRecords(key, items.value)
           localStorage.removeItem(key)
         }
       }
@@ -109,7 +109,7 @@ export function useHistory<T extends Record<string, unknown>>(
     }
   }
 
-  loadFromDB() // 优化：异步加载，不 await
+  const ready = loadFromDB() // 优化：异步加载，不 await
 
   function formatUUID(): string {
     try {
@@ -147,17 +147,12 @@ export function useHistory<T extends Record<string, unknown>>(
     }
   }
 
-  let addTimer: ReturnType<typeof setTimeout> | null = null
-  let pendingData: T | null = null
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let pendingSave: Promise<void> = Promise.resolve()
 
   function add(data: T) {
-    pendingData = data
-    if (addTimer) clearTimeout(addTimer)
-    addTimer = setTimeout(() => {
-      if (pendingData === null) return
-      doAdd(pendingData)
-      pendingData = null
-    }, debounceMs)
+    doAdd(data)
+    return scheduleSave()
   }
 
   function doAdd(data: T) {
@@ -187,22 +182,42 @@ export function useHistory<T extends Record<string, unknown>>(
     }
 
     items.value = arr
-    // 优化：使用 requestIdleCallback 延迟保存，不阻塞 UI
-    scheduleIdleTask(() => save())
+  }
+
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer)
+    pendingSave = new Promise<void>((resolve, reject) => {
+      saveTimer = setTimeout(() => {
+        saveTimer = null
+        scheduleIdleTask(() => save())
+          .then(() => resolve())
+          .catch(reject)
+      }, Math.max(0, debounceMs))
+    })
+    return pendingSave
+  }
+
+  function flush() {
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+      pendingSave = scheduleIdleTask(() => save())
+    }
+    return pendingSave
   }
 
   function remove(id: string) {
     items.value = items.value.filter((item) => item.id !== id)
 
     // 优化：使用 requestIdleCallback 延迟保存
-    scheduleIdleTask(() => {
+    return scheduleIdleTask(() => {
       if (useIndexedDB) {
-        deleteHistoryRecord(key, id).catch((e) => {
-          console.error('[history] IndexedDB remove error', key, id, e)
-        })
+        return deleteHistoryRecord(key, id)
       } else {
-        saveToLocalStorage()
+        return saveToLocalStorage()
       }
+    }).catch((e) => {
+      console.error('[history] remove error', key, id, e)
     })
   }
 
@@ -210,25 +225,29 @@ export function useHistory<T extends Record<string, unknown>>(
     items.value = []
 
     // 优化：使用 requestIdleCallback 延迟清理
-    scheduleIdleTask(() => {
+    return scheduleIdleTask(() => {
       if (useIndexedDB) {
-        clearHistoryRecords(key).catch((e) => {
-          console.error('[history] IndexedDB clear error', key, e)
-        })
+        return clearHistoryRecords(key)
       } else {
         try {
           localStorage.removeItem(localStorageKey)
+          return Promise.resolve()
         } catch (e) {
           console.error('[history] localStorage clear error', key, e)
+          return Promise.reject(e)
         }
       }
+    }).catch((e) => {
+      console.error('[history] clear error', key, e)
     })
   }
 
   return {
     items,
+    ready,
     add,
     remove,
     clear,
+    flush,
   }
 }

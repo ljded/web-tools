@@ -62,7 +62,7 @@
 | 状态管理 | Pinia 3 |
 | 国际化 | Vue I18n 11 + Nuxt UI locale |
 | PWA | vite-plugin-pwa + Workbox |
-| 测试 | Vitest 3 + happy-dom，Playwright |
+| 测试 | Vitest 4 + happy-dom，Playwright |
 | 编辑器 | Monaco Editor |
 | 存储 | IndexedDB + localStorage |
 
@@ -168,7 +168,7 @@ scripts/
 2. 注册工具：`src/tools/registry.ts`
 3. 补充文案：`src/i18n/locales/zh-CN.ts` 与 `src/i18n/locales/en-US.ts`
 4. 若是重计算任务：在 `src/workers/` 增加或复用 worker
-5. 运行校验：`npm run type-check && npm run test && npm run build`
+5. 运行校验：`npm run verify`
 
 ### 3) 想加“入口体验功能”（收藏/最近使用）
 当前已实现：
@@ -270,6 +270,7 @@ npm run preview
 常用检查命令：
 
 ```bash
+npm run verify
 npm run type-check
 npm run test
 npm run build
@@ -278,6 +279,9 @@ npm run build
 其他命令：
 
 ```bash
+npm run check-public-assets # 检查 public 是否包含禁止发布的静态资源
+npm run check-build-assets  # 检查 dist 是否包含禁止发布的静态资源
+npm run check-bundle-budget # 检查 PWA 预缓存、入口资源和 public/apps 体积预算
 npm run check-i18n       # 检查国际化文件
 npm run format           # 格式化代码
 npm run test:watch       # 监听模式运行测试
@@ -286,7 +290,7 @@ npm run test:e2e         # 运行端到端测试
 npm run analyze          # 分析打包体积
 ```
 
-`npm run build` 会先执行 `vue-tsc --build`，再运行 Vite 生产构建。
+`npm run build` 会依次执行公开资源扫描、类型检查、Vite 生产构建、构建产物扫描和体积预算检查。`npm run verify` 会在此基础上额外运行单元测试和 i18n 检查，适合作为提交前完整校验。
 
 ## Node.js 要求
 
@@ -347,4 +351,5 @@ node scripts/stream-profile-analyzer.js     # 流式分析
 3. 在 `src/tools/registry.ts` 中注册工具定义，包括 `name`、`path`、`i18nKey`、`domain`、`icon`、`color`、`component`、`keywords`、`tags`、`capabilities`。
 4. 在 `src/i18n/` 中补充业务文案。
 5. 如果涉及 worker，确保“页面调用命令名”和“worker switch 分支命令名”完全一致。
-6. 运行 `npm run type-check`、`npm run test`、`npm run build` 验证。
+6. 如新增静态资源，确认不会触发 `check-public-assets`，并评估 PWA/构建体积影响。
+7. 运行 `npm run verify` 验证。

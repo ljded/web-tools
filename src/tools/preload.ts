@@ -4,11 +4,20 @@ const PRELOADED_TOOLS_KEY = 'web-tools:preloaded-tools'
 
 interface PreloadedToolsState {
   appVersion: string
-  tools: Record<string, number>
+  tools: Record<string, PreloadedToolRecord>
 }
 
 type IdleScheduler = (callback: () => void) => void
 export type PreloadToolResult = 'loaded' | 'failed' | 'skipped'
+
+interface PreloadedToolRecord {
+  at: number
+  assets: boolean
+}
+
+interface PreloadToolOptions {
+  includeAssets?: boolean
+}
 
 function createPreloadedToolsState(): PreloadedToolsState {
   return { appVersion: __APP_VERSION__, tools: {} }
@@ -31,9 +40,7 @@ export function getPreloadedToolsState(): PreloadedToolsState {
     ) {
       return {
         appVersion: __APP_VERSION__,
-        tools: Object.fromEntries(
-          Object.entries(parsed.tools).filter((entry): entry is [string, number] => typeof entry[0] === 'string' && typeof entry[1] === 'number'),
-        ),
+        tools: normalizePreloadedToolRecords(parsed.tools),
       }
     }
   } catch {
@@ -41,6 +48,30 @@ export function getPreloadedToolsState(): PreloadedToolsState {
   }
 
   return createPreloadedToolsState()
+}
+
+function normalizePreloadedToolRecords(value: unknown): Record<string, PreloadedToolRecord> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([name, record]) => {
+      if (typeof record === 'number') {
+        return [[name, { at: record, assets: false } satisfies PreloadedToolRecord]]
+      }
+      if (
+        record &&
+        typeof record === 'object' &&
+        !Array.isArray(record) &&
+        typeof (record as { at?: unknown }).at === 'number'
+      ) {
+        return [[name, {
+          at: (record as { at: number }).at,
+          assets: (record as { assets?: unknown }).assets === true,
+        } satisfies PreloadedToolRecord]]
+      }
+      return []
+    }),
+  )
 }
 
 export function getPreloadedToolsStorageStatus() {
@@ -66,7 +97,11 @@ export function getPreloadedToolsStorageStatus() {
 }
 
 export function getPreloadedToolNames() {
-  return new Set(Object.keys(getPreloadedToolsState().tools))
+  return new Set(
+    Object.entries(getPreloadedToolsState().tools)
+      .filter(([, record]) => record.assets)
+      .map(([name]) => name),
+  )
 }
 
 function savePreloadedToolsState(state: PreloadedToolsState) {
@@ -91,9 +126,10 @@ function scheduleIdle() {
   return new Promise<void>((resolve) => schedule(resolve))
 }
 
-export async function preloadTool(tool: Pick<ToolDefinition, 'component'>) {
+export async function preloadTool(tool: Pick<ToolDefinition, 'component' | 'preloadAssets'>, options: PreloadToolOptions = {}) {
   try {
     await tool.component()
+    if (options.includeAssets) await tool.preloadAssets?.()
     return true
   } catch {
     // Preloading is opportunistic and must never affect tool usage.
@@ -101,17 +137,21 @@ export async function preloadTool(tool: Pick<ToolDefinition, 'component'>) {
   }
 }
 
-export async function preloadToolByNameNow(name: string): Promise<PreloadToolResult> {
+export async function preloadToolByNameNow(name: string, options: PreloadToolOptions = {}): Promise<PreloadToolResult> {
   const tool = tools.find((item) => item.name === name)
   if (!tool) return 'failed'
 
   const state = getPreloadedToolsState()
-  if (state.tools[tool.name]) return 'skipped'
+  const existing = state.tools[tool.name]
+  if (existing && (!options.includeAssets || existing.assets)) return 'skipped'
 
-  const ok = await preloadTool(tool)
+  const ok = await preloadTool(tool, options)
   if (!ok) return 'failed'
 
-  state.tools[tool.name] = Date.now()
+  state.tools[tool.name] = {
+    at: Date.now(),
+    assets: existing?.assets === true || options.includeAssets === true,
+  }
   savePreloadedToolsState(state)
   return 'loaded'
 }
@@ -121,7 +161,7 @@ export function preloadToolByName(name: string) {
   schedule(() => { void preloadToolByNameNow(name) })
 }
 
-export async function preloadToolsByNamesInBackground(names: string[], maxCount = 6) {
+export async function preloadToolsByNamesInBackground(names: string[], maxCount = 6, options: PreloadToolOptions = {}) {
   const queue = [...new Set(names)].slice(0, maxCount)
   let loaded = 0
   let failed = 0
@@ -131,7 +171,7 @@ export async function preloadToolsByNamesInBackground(names: string[], maxCount 
 
   for (const name of queue) {
     await scheduleIdle()
-    const result = await preloadToolByNameNow(name)
+    const result = await preloadToolByNameNow(name, options)
     if (result === 'loaded') loaded++
     else if (result === 'failed') {
       failed++

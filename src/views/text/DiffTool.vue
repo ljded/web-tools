@@ -197,8 +197,8 @@ const tabItems = computed(() => [
 const imageModeItems = computed(() => [
   { label: t('tools.diff.sideBySide'), value: 'side' },
   { label: t('tools.diff.overlay'), value: 'overlay' },
-  { label: '滑动对比', value: 'slider' },
-  { label: '差异高亮', value: 'difference' },
+  { label: t('tools.diff.slider'), value: 'slider' },
+  { label: t('tools.diff.difference'), value: 'difference' },
 ])
 
 // 计算图片差异
@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
           <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-x" class="rounded-full" :disabled="!oldText" @click="clearText('old')">{{ $t('tools.diff.clearOld') }}</UButton>
           <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-x" class="rounded-full" :disabled="!newText" @click="clearText('new')">{{ $t('tools.diff.clearNew') }}</UButton>
           <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-refresh-cw" class="rounded-full" @click="swap">{{ $t('tools.diff.swap') }}</UButton>
-          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-trash2" class="rounded-full" :disabled="!oldText && !newText" @click="clearAllText">{{ $t('tools.diff.clearAll') }}</UButton>
+          <UButton color="neutral" variant="soft" size="sm" icon="i-lucide-trash-2" class="rounded-full" :disabled="!oldText && !newText" @click="clearAllText">{{ $t('tools.diff.clearAll') }}</UButton>
         </template>
 
         <div class="h-[600px] w-full overflow-hidden">
@@ -335,7 +335,7 @@ onBeforeUnmount(() => {
           <USlider v-if="imgMode === 'overlay'" v-model="imgOpacity" :min="0" :max="100" :step="1" class="w-32" />
           <span v-if="imgMode === 'overlay'" class="text-xs text-muted">{{ imgOpacity }}%</span>
           <USlider v-if="imgMode === 'difference'" v-model="diffThreshold" :min="0" :max="100" :step="5" class="w-32" />
-          <span v-if="imgMode === 'difference'" class="text-xs text-muted">灵敏度: {{ diffThreshold }}</span>
+          <span v-if="imgMode === 'difference'" class="text-xs text-muted">{{ $t('tools.diff.sensitivity') }}: {{ diffThreshold }}</span>
         </template>
 
         <div class="space-y-5">
@@ -343,12 +343,12 @@ onBeforeUnmount(() => {
             <div>
               <div class="mb-2 flex items-center justify-between">
                 <span class="text-sm font-medium text-muted">{{ $t('tools.diff.imageA') }}</span>
-                <UButton v-if="imgA" color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('a')" class="rounded-full text-xs">{{ $t('app.clear') }}</UButton>
+                <UButton v-if="imgA" color="neutral" variant="ghost" icon="i-lucide-trash-2" @click="clearImg('a')" class="rounded-full text-xs">{{ $t('app.clear') }}</UButton>
               </div>
               <FileDropZone v-if="!imgA" accept="image/*" :title="$t('tools.diff.uploadOrDropImage')" icon="i-lucide-image-up" ui-base="hig-subtle-surface rounded-[1.75rem] border border-dashed transition-colors hover:border-primary/40 hover:bg-primary/5 py-8" @files="onImgFiles($event, 'a')" />
               <div v-else class="hig-subtle-surface flex items-center justify-between rounded-[1.75rem] border px-4 py-8">
                 <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium text-default">{{ imgAFile?.name || '图片 A' }}</div>
+                  <div class="truncate text-sm font-medium text-default">{{ imgAFile?.name || $t('tools.diff.imageA') }}</div>
                   <div v-if="imgAFile" class="mt-1 text-xs text-muted">{{ formatFileSize(imgAFile.size) }}</div>
                 </div>
                 <UButton color="neutral" variant="ghost" @click="clearImg('a')" class="ml-3 shrink-0 rounded-full text-xs">{{ $t('app.clear') }}</UButton>
@@ -357,12 +357,12 @@ onBeforeUnmount(() => {
             <div>
               <div class="mb-2 flex items-center justify-between">
                 <span class="text-sm font-medium text-muted">{{ $t('tools.diff.imageB') }}</span>
-                <UButton v-if="imgB" color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('b')" class="rounded-full text-xs">{{ $t('app.clear') }}</UButton>
+                <UButton v-if="imgB" color="neutral" variant="ghost" icon="i-lucide-trash-2" @click="clearImg('b')" class="rounded-full text-xs">{{ $t('app.clear') }}</UButton>
               </div>
               <FileDropZone v-if="!imgB" accept="image/*" :title="$t('tools.diff.uploadOrDropImage')" icon="i-lucide-image-up" ui-base="hig-subtle-surface rounded-[1.75rem] border border-dashed transition-colors hover:border-primary/40 hover:bg-primary/5 py-8" @files="onImgFiles($event, 'b')" />
               <div v-else class="hig-subtle-surface flex items-center justify-between rounded-[1.75rem] border px-4 py-8">
                 <div class="min-w-0 flex-1">
-                  <div class="truncate text-sm font-medium text-default">{{ imgBFile?.name || '图片 B' }}</div>
+                  <div class="truncate text-sm font-medium text-default">{{ imgBFile?.name || $t('tools.diff.imageB') }}</div>
                   <div v-if="imgBFile" class="mt-1 text-xs text-muted">{{ formatFileSize(imgBFile.size) }}</div>
                 </div>
                 <UButton color="neutral" variant="ghost" @click="clearImg('b')" class="ml-3 shrink-0 rounded-full text-xs">{{ $t('app.clear') }}</UButton>
@@ -373,17 +373,17 @@ onBeforeUnmount(() => {
           <!-- 两张图片都上传后，显示紧凑的文件信息 -->
           <div v-else class="flex flex-wrap items-center gap-3 rounded-[1.75rem] border bg-elevated p-3">
             <div class="flex items-center gap-2">
-              <span class="text-xs text-muted">图片 A:</span>
-              <span class="text-sm font-medium">{{ imgAFile?.name || '图片 A' }}</span>
+              <span class="text-xs text-muted">{{ $t('tools.diff.imageA') }}:</span>
+              <span class="text-sm font-medium">{{ imgAFile?.name || $t('tools.diff.imageA') }}</span>
               <span v-if="imgAFile" class="text-xs text-muted">{{ formatFileSize(imgAFile.size) }}</span>
-              <UButton color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('a')" size="xs" class="rounded-full" />
+              <UButton color="neutral" variant="ghost" icon="i-lucide-trash-2" @click="clearImg('a')" size="xs" class="rounded-full" />
             </div>
             <div class="h-4 w-px bg-border"></div>
             <div class="flex items-center gap-2">
-              <span class="text-xs text-muted">图片 B:</span>
-              <span class="text-sm font-medium">{{ imgBFile?.name || '图片 B' }}</span>
+              <span class="text-xs text-muted">{{ $t('tools.diff.imageB') }}:</span>
+              <span class="text-sm font-medium">{{ imgBFile?.name || $t('tools.diff.imageB') }}</span>
               <span v-if="imgBFile" class="text-xs text-muted">{{ formatFileSize(imgBFile.size) }}</span>
-              <UButton color="neutral" variant="ghost" icon="i-lucide-trash2" @click="clearImg('b')" size="xs" class="rounded-full" />
+              <UButton color="neutral" variant="ghost" icon="i-lucide-trash-2" @click="clearImg('b')" size="xs" class="rounded-full" />
             </div>
           </div>
 
@@ -432,7 +432,7 @@ onBeforeUnmount(() => {
 
             <!-- 差异高亮 -->
             <div v-else-if="imgMode === 'difference'" class="hig-subtle-surface flex min-h-[500px] items-center justify-center rounded-[1.75rem] border p-4">
-              <img v-if="diffImageUrl" :src="diffImageUrl" class="max-h-[500px] max-w-full rounded-lg object-contain" alt="差异高亮" />
+              <img v-if="diffImageUrl" :src="diffImageUrl" class="max-h-[500px] max-w-full rounded-lg object-contain" :alt="$t('tools.diff.differenceAlt')" />
               <div v-else class="text-center text-sm text-muted">{{ $t('tools.diff.computingDifference') }}</div>
             </div>
           </div>

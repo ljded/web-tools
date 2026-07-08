@@ -155,7 +155,7 @@ if (depth === 0) {
         preview
       }}</span>
       <span v-else-if="isOverMaxDepth" class="text-muted">
-        {{ t('app.maxDepthReached', { depth: maxDepth }) || `[最大深度 ${maxDepth}]` }}
+        {{ t('app.maxDepthReached', { depth: maxDepth }) }}
       </span>
 
       <UButton

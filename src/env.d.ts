@@ -3,6 +3,11 @@
 
 declare const __APP_VERSION__: string
 
+declare module 'virtual:used-lucide-icons' {
+  const icons: import('@iconify/types').IconifyJSON
+  export default icons
+}
+
 declare module 'sm-crypto' {
   export function sm3(input: string): string
   export namespace sm2 {

@@ -8,68 +8,75 @@ describe('useHistory', () => {
   })
 
   it('should initialize with empty items', () => {
-    const history = useHistory<{ value: string }>('test-history')
+    const history = useHistory<{ value: string }>('test-history-init')
     expect(history.items.value).toEqual([])
   })
 
-  it('should add items to history', () => {
-    const history = useHistory<{ value: string }>('test-history')
+  it('should add items to history', async () => {
+    const history = useHistory<{ value: string }>('test-history-add', { debounceMs: 0 })
+    await history.ready
 
-    history.add({ value: 'test1' })
+    await history.add({ value: 'test1' })
     expect(history.items.value).toHaveLength(1)
     expect(history.items.value[0]?.data.value).toBe('test1')
   })
 
-  it('should generate labels for items', () => {
-    const history = useHistory<{ value: string }>('test-history', {
+  it('should generate labels for items', async () => {
+    const history = useHistory<{ value: string }>('test-history-label', {
+      debounceMs: 0,
       generateLabel: (data) => `Label: ${data.value}`,
     })
+    await history.ready
 
-    history.add({ value: 'test1' })
+    await history.add({ value: 'test1' })
     expect(history.items.value[0]?.label).toBe('Label: test1')
   })
 
-  it('should limit history to maxCount', () => {
-    const history = useHistory<{ value: string }>('test-history', {
+  it('should limit history to maxCount', async () => {
+    const history = useHistory<{ value: string }>('test-history-limit', {
       maxCount: 3,
+      debounceMs: 0,
     })
+    await history.ready
 
-    history.add({ value: 'test1' })
-    history.add({ value: 'test2' })
-    history.add({ value: 'test3' })
-    history.add({ value: 'test4' })
+    await history.add({ value: 'test1' })
+    await history.add({ value: 'test2' })
+    await history.add({ value: 'test3' })
+    await history.add({ value: 'test4' })
 
     expect(history.items.value).toHaveLength(3)
     expect(history.items.value[0]?.data.value).toBe('test4')
   })
 
-  it('should move duplicate to front', () => {
-    const history = useHistory<{ value: string }>('test-history')
+  it('should move duplicate to front', async () => {
+    const history = useHistory<{ value: string }>('test-history-duplicate', { debounceMs: 0 })
+    await history.ready
 
-    history.add({ value: 'test1' })
-    history.add({ value: 'test2' })
-    history.add({ value: 'test1' })
+    await history.add({ value: 'test1' })
+    await history.add({ value: 'test2' })
+    await history.add({ value: 'test1' })
 
     expect(history.items.value).toHaveLength(2)
     expect(history.items.value[0]?.data.value).toBe('test1')
     expect(history.items.value[1]?.data.value).toBe('test2')
   })
 
-  it('should remove items by id', () => {
-    const history = useHistory<{ value: string }>('test-history')
+  it('should remove items by id', async () => {
+    const history = useHistory<{ value: string }>('test-history-remove', { debounceMs: 0 })
+    await history.ready
 
-    history.add({ value: 'test1' })
-    history.add({ value: 'test2' })
+    await history.add({ value: 'test1' })
+    await history.add({ value: 'test2' })
 
     const idToRemove = history.items.value[0]!.id
-    history.remove(idToRemove)
+    await history.remove(idToRemove)
 
     expect(history.items.value).toHaveLength(1)
-    expect(history.items.value[0]?.data.value).toBe('test2')
+    expect(history.items.value[0]?.data.value).toBe('test1')
   })
 
   it('should clear all items', () => {
-    const history = useHistory<{ value: string }>('test-history')
+    const history = useHistory<{ value: string }>('test-history-clear', { debounceMs: 0 })
 
     history.add({ value: 'test1' })
     history.add({ value: 'test2' })
@@ -78,12 +85,15 @@ describe('useHistory', () => {
     expect(history.items.value).toEqual([])
   })
 
-  it('should persist to localStorage', () => {
-    const history = useHistory<{ value: string }>('test-history')
-    history.add({ value: 'test1' })
+  it('should persist to IndexedDB', async () => {
+    const history = useHistory<{ value: string }>('test-history-persist', { debounceMs: 0 })
+    await history.ready
+    await history.add({ value: 'test1' })
+    await history.flush()
 
     // 创建新实例，应该加载之前的数据
-    const history2 = useHistory<{ value: string }>('test-history')
+    const history2 = useHistory<{ value: string }>('test-history-persist', { debounceMs: 0 })
+    await history2.ready
     expect(history2.items.value).toHaveLength(1)
     expect(history2.items.value[0]?.data.value).toBe('test1')
   })

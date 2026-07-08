@@ -43,9 +43,15 @@ function genMAC(): string { return Array.from({ length: 6 }, () => randomInt(0, 
 function genPassword(len = 16): string { const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*'; let s = ''; for (let i = 0; i < len; i++) s += chars[randomInt(0, chars.length - 1)]; return s }
 function genRandomString(): string { const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let s = ''; for (let i = 0; i < 16; i++) s += chars[randomInt(0, chars.length - 1)]; return s }
 
-async function genName(): Promise<string> { const mod = await import('@faker-js/faker'); const f = (mod as any).fakerZH_CN || mod.faker; return f.person.fullName() }
-async function genAddress(): Promise<string> { const mod = await import('@faker-js/faker'); const f = (mod as any).fakerZH_CN || mod.faker; return f.location.city() + f.location.streetAddress() }
-async function genCompany(): Promise<string> { const mod = await import('@faker-js/faker'); const f = (mod as any).fakerZH_CN || mod.faker; return f.company.name() }
+let fakerZhPromise: Promise<typeof import('@faker-js/faker/locale/zh_CN').faker> | null = null
+function loadFakerZh() {
+  fakerZhPromise ??= import('@faker-js/faker/locale/zh_CN').then((mod) => mod.faker)
+  return fakerZhPromise
+}
+
+async function genName(): Promise<string> { return (await loadFakerZh()).person.fullName() }
+async function genAddress(): Promise<string> { const f = await loadFakerZh(); return f.location.city() + f.location.streetAddress() }
+async function genCompany(): Promise<string> { return (await loadFakerZh()).company.name() }
 
 interface GeneratorConfig { key: string; gen: () => string | Promise<string> }
 const generatorConfigs: GeneratorConfig[] = [

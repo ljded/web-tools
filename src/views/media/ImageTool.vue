@@ -704,7 +704,7 @@ watch(labOp, () => {
             <img :src="item.preview" class="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-sm" />
             <div class="min-w-0 flex-1"><div class="truncate text-sm">{{ item.file.name }}</div><UBadge v-if="item.error" color="error" variant="soft" size="xs">{{ item.error }}</UBadge><UBadge v-else-if="item.loading" color="info" variant="soft" size="xs">{{ $t('tools.image.compressing') }}</UBadge><UBadge v-else-if="item.processing" color="info" variant="soft" size="xs">{{ $t('tools.image.processing') }}</UBadge><div v-else-if="item.resultFile" class="text-xs text-success">{{ $t('tools.image.done') }} <span v-if="item.ratio" class="ml-1">(-{{ item.ratio }})</span></div></div>
             <UButton v-if="item.resultFile && item.resultUrl" color="primary" variant="ghost" icon="i-lucide-download" class="rounded-full" @click="downloadItem(item)" />
-            <UButton color="neutral" variant="ghost" icon="i-lucide-trash2" class="rounded-full" @click="removeItem(i)" />
+            <UButton color="neutral" variant="ghost" icon="i-lucide-trash-2" class="rounded-full" @click="removeItem(i)" />
           </div>
         </div>
       </ToolSection>

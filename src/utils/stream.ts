@@ -16,31 +16,38 @@ export async function fileToBase64Stream(
   onProgress?: (progress: number) => void,
   chunkSize: number = 1024 * 1024 // 1MB chunks
 ): Promise<string> {
-  const reader = file.stream().getReader()
   const chunks: string[] = []
   let bytesRead = 0
+  let carry = new Uint8Array(0)
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
+  if (file.size === 0) {
+    onProgress?.(100)
+    return ''
+  }
 
-      // 将 Uint8Array 转换为 Base64
-      const chunk = arrayBufferToBase64(value.buffer)
-      chunks.push(chunk)
+  for (let offset = 0; offset < file.size; offset += chunkSize) {
+    const buffer = await file.slice(offset, offset + chunkSize).arrayBuffer()
+    let bytes = new Uint8Array(buffer)
 
-      bytesRead += value.byteLength
-      if (onProgress) {
-        const progress = Math.round((bytesRead / file.size) * 100)
-        onProgress(progress)
-      }
+    if (carry.length) {
+      const merged = new Uint8Array(carry.length + bytes.length)
+      merged.set(carry)
+      merged.set(bytes, carry.length)
+      bytes = merged
     }
 
-    // 合并所有块
-    return chunks.join('')
-  } finally {
-    reader.releaseLock()
+    const completeLength = Math.floor(bytes.length / 3) * 3
+    if (completeLength > 0) {
+      chunks.push(uint8ArrayToBase64(bytes.subarray(0, completeLength)))
+    }
+    carry = bytes.subarray(completeLength)
+
+    bytesRead = Math.min(file.size, offset + chunkSize)
+    onProgress?.(Math.round((bytesRead / file.size) * 100))
   }
+
+  if (carry.length) chunks.push(uint8ArrayToBase64(carry))
+  return chunks.join('')
 }
 
 /**
@@ -68,10 +75,11 @@ export async function base64ToBlob(
   }
 
   const totalChars = cleanBase64.length
+  const safeChunkSize = Math.max(4, Math.floor(chunkSize / 4) * 4)
 
   // 分块解码
-  for (let i = 0; i < totalChars; i += chunkSize) {
-    const chunk = cleanBase64.slice(i, Math.min(i + chunkSize, totalChars))
+  for (let i = 0; i < totalChars; i += safeChunkSize) {
+    const chunk = cleanBase64.slice(i, Math.min(i + safeChunkSize, totalChars))
 
     try {
       const binaryString = atob(chunk)
@@ -103,7 +111,10 @@ export async function base64ToBlob(
  * @returns Base64 字符串
  */
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer)
+  return uint8ArrayToBase64(new Uint8Array(buffer))
+}
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = ''
 
   for (let i = 0; i < bytes.length; i++) {
@@ -128,27 +139,28 @@ export async function computeFileHashStream(
 ): Promise<string> {
   const reader = file.stream().getReader()
   let bytesRead = 0
-
-  // 使用 Web Crypto API 进行流式哈希计算
-  const hashBuffer: number[] = []
+  const chunks: Uint8Array[] = []
 
   try {
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
 
-      // 计算当前块的哈希
-      const chunkHash = await crypto.subtle.digest(algorithm, value)
-      hashBuffer.push(...new Uint8Array(chunkHash))
+      chunks.push(value.slice())
 
       bytesRead += value.byteLength
-      if (onProgress) {
-        const progress = Math.round((bytesRead / file.size) * 100)
-        onProgress(progress)
-      }
+      onProgress?.(file.size ? Math.round((bytesRead / file.size) * 100) : 100)
     }
 
-    // 将最终哈希转换为十六进制字符串
+    const data = new Uint8Array(bytesRead)
+    let offset = 0
+    for (const chunk of chunks) {
+      data.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+
+    const hashBuffer = await crypto.subtle.digest(algorithm, data)
+    onProgress?.(100)
     return Array.from(new Uint8Array(hashBuffer))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('')

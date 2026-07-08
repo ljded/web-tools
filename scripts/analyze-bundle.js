@@ -69,6 +69,30 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(2)}MB`
 }
 
+function isVendoredAppAsset(file) {
+  return file.name.replace(/\\/g, '/').startsWith('apps/')
+}
+
+function total(files) {
+  return files.reduce((sum, f) => sum + f.size, 0)
+}
+
+function printTopFiles(title, files, limit = 10) {
+  if (!files.length) return
+
+  console.log(title)
+  const sorted = [...files].sort((a, b) => b.size - a.size)
+  for (const file of sorted.slice(0, limit)) {
+    const bar = '█'.repeat(Math.min(40, Math.ceil(file.sizeKB / 100)))
+    console.log(`  ${formatSize(file.size).padEnd(12)} ${bar} ${file.name}`)
+  }
+  if (sorted.length > limit) {
+    console.log(`  ... 还有 ${sorted.length - limit} 个文件`)
+  }
+  console.log(`  小计: ${formatSize(total(sorted))}`)
+  console.log()
+}
+
 /**
  * 分析 dist 目录
  */
@@ -114,7 +138,7 @@ function analyzeBuild() {
       sizeMB: size / (1024 * 1024),
     }
 
-    if (ext === 'js') {
+    if (ext === 'js' || ext === 'mjs') {
       filesByType.js.push(fileSize)
     } else if (ext === 'css') {
       filesByType.css.push(fileSize)
@@ -131,47 +155,28 @@ function analyzeBuild() {
   console.log('📊 总览:')
   console.log(`  总文件数: ${allFiles.length}`)
   console.log(`  总大小: ${formatSize(totalSize)}`)
+  const vendoredAppFiles = Object.values(filesByType).flat().filter(isVendoredAppAsset)
+  const mainAppFiles = Object.values(filesByType).flat().filter((file) => !isVendoredAppAsset(file))
+  console.log(`  主应用资产: ${formatSize(total(mainAppFiles))}`)
+  console.log(`  内置第三方应用资产: ${formatSize(total(vendoredAppFiles))}`)
   console.log()
 
   // 打印 JavaScript 文件
   if (filesByType.js.length > 0) {
-    console.log('📜 JavaScript 文件:')
-    const sortedJs = filesByType.js.sort((a, b) => b.size - a.size)
-    const totalJs = sortedJs.reduce((sum, f) => sum + f.size, 0)
-
-    for (const file of sortedJs.slice(0, 10)) {
-      const bar = '█'.repeat(Math.ceil(file.sizeKB / 10))
-      console.log(`  ${formatSize(file.size).padEnd(12)} ${bar} ${file.name}`)
-    }
-
-    if (sortedJs.length > 10) {
-      console.log(`  ... 还有 ${sortedJs.length - 10} 个文件`)
-    }
-
-    console.log(`  JS 总大小: ${formatSize(totalJs)}`)
-    console.log()
+    printTopFiles('📜 主应用 JavaScript 文件:', filesByType.js.filter((file) => !isVendoredAppAsset(file)))
+    printTopFiles('📜 内置第三方应用 JavaScript 文件:', filesByType.js.filter(isVendoredAppAsset))
   }
 
   // 打印 CSS 文件
   if (filesByType.css.length > 0) {
-    console.log('🎨 CSS 文件:')
-    const sortedCss = filesByType.css.sort((a, b) => b.size - a.size)
-    const totalCss = sortedCss.reduce((sum, f) => sum + f.size, 0)
-
-    for (const file of sortedCss) {
-      console.log(`  ${formatSize(file.size).padEnd(12)} ${file.name}`)
-    }
-
-    console.log(`  CSS 总大小: ${formatSize(totalCss)}`)
-    console.log()
+    printTopFiles('🎨 主应用 CSS 文件:', filesByType.css.filter((file) => !isVendoredAppAsset(file)))
+    printTopFiles('🎨 内置第三方应用 CSS 文件:', filesByType.css.filter(isVendoredAppAsset))
   }
 
   // 打印资源文件
   if (filesByType.assets.length > 0) {
     console.log('🖼️  资源文件:')
     const sortedAssets = filesByType.assets.sort((a, b) => b.size - a.size)
-    const totalAssets = sortedAssets.reduce((sum, f) => sum + f.size, 0)
-
     for (const file of sortedAssets.slice(0, 10)) {
       console.log(`  ${formatSize(file.size).padEnd(12)} ${file.name}`)
     }
@@ -180,7 +185,7 @@ function analyzeBuild() {
       console.log(`  ... 还有 ${sortedAssets.length - 10} 个文件`)
     }
 
-    console.log(`  资源总大小: ${formatSize(totalAssets)}`)
+    console.log(`  资源总大小: ${formatSize(total(sortedAssets))}`)
     console.log()
   }
 
@@ -189,10 +194,10 @@ function analyzeBuild() {
   console.log()
 
   // 检查大文件
-  const largeFiles = [...filesByType.js, ...filesByType.css].filter((f) => f.sizeKB > 500)
+  const largeFiles = [...filesByType.js, ...filesByType.css].filter((f) => !isVendoredAppAsset(f) && f.sizeKB > 500)
 
   if (largeFiles.length > 0) {
-    console.log('⚠️  发现大文件 (>500KB):')
+    console.log('⚠️  主应用发现大文件 (>500KB):')
     for (const file of largeFiles) {
       console.log(`  - ${file.name} (${formatSize(file.size)})`)
     }
@@ -201,7 +206,7 @@ function analyzeBuild() {
   }
 
   // 检查 vendor chunks
-  const vendorFiles = filesByType.js.filter((f) => f.name.includes('vendor'))
+  const vendorFiles = filesByType.js.filter((f) => !isVendoredAppAsset(f) && f.name.includes('vendor'))
   if (vendorFiles.length > 0) {
     const totalVendor = vendorFiles.reduce((sum, f) => sum + f.size, 0)
     console.log(`📦 Vendor 包大小: ${formatSize(totalVendor)}`)
@@ -213,8 +218,8 @@ function analyzeBuild() {
 
   // Bundle 大小目标
   console.log('🎯 Bundle 大小目标:')
-  const jsSize = filesByType.js.reduce((sum, f) => sum + f.size, 0)
-  const cssSize = filesByType.css.reduce((sum, f) => sum + f.size, 0)
+  const jsSize = total(filesByType.js.filter((file) => !isVendoredAppAsset(file)))
+  const cssSize = total(filesByType.css.filter((file) => !isVendoredAppAsset(file)))
 
   const jsSizeKB = jsSize / 1024
   const cssSizeKB = cssSize / 1024

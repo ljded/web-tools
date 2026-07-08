@@ -25,6 +25,15 @@ function setStoredValue<T>(key: string, value: T) {
   }
 }
 
+function cloneForCompare<T>(value: T): T {
+  if (value === null || typeof value !== 'object') return value
+  try {
+    return structuredClone(value)
+  } catch {
+    return JSON.parse(JSON.stringify(value)) as T
+  }
+}
+
 function isCompatibleStoredValue<T>(value: unknown, initialValue: T): value is T {
   if (initialValue === null || initialValue === undefined) return true
   if (Array.isArray(initialValue)) return Array.isArray(value)
@@ -59,7 +68,7 @@ export function usePersistedRef<T>(key: string, initialValue: T): Ref<T> {
   }
 
   let writeTimer: ReturnType<typeof setTimeout> | null = null
-  let lastSavedValue: T = state.value
+  let lastSavedValue: T = cloneForCompare(state.value)
 
   // 优化：根据值类型智能选择 deep watch
   const shouldUseDeepWatch = typeof initialValue === 'object' && initialValue !== null && !Array.isArray(initialValue)
@@ -76,7 +85,7 @@ export function usePersistedRef<T>(key: string, initialValue: T): Ref<T> {
       writeTimer = setTimeout(() => {
         writeTimer = null
         setStoredValue(key, value)
-        lastSavedValue = value
+        lastSavedValue = cloneForCompare(value)
       }, WRITE_DELAY)
     },
     { deep: shouldUseDeepWatch },

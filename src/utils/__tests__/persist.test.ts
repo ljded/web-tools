@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { usePersistedRef } from '../persist'
 
+const waitPersist = () => new Promise((resolve) => setTimeout(resolve, 150))
+
 describe('usePersistedRef', () => {
   beforeEach(() => {
     localStorage.clear()
@@ -11,41 +13,46 @@ describe('usePersistedRef', () => {
     expect(ref.value).toBe('default')
   })
 
-  it('should persist string values', () => {
+  it('should persist string values', async () => {
     const ref = usePersistedRef('test-key', 'initial')
     ref.value = 'updated'
+    await waitPersist()
 
     const ref2 = usePersistedRef('test-key', 'initial')
     expect(ref2.value).toBe('updated')
   })
 
-  it('should persist number values', () => {
+  it('should persist number values', async () => {
     const ref = usePersistedRef('test-number', 42)
     ref.value = 100
+    await waitPersist()
 
     const ref2 = usePersistedRef('test-number', 42)
     expect(ref2.value).toBe(100)
   })
 
-  it('should persist object values', () => {
+  it('should persist object values', async () => {
     const ref = usePersistedRef('test-object', { count: 0 })
     ref.value = { count: 5 }
+    await waitPersist()
 
     const ref2 = usePersistedRef('test-object', { count: 0 })
     expect(ref2.value).toEqual({ count: 5 })
   })
 
-  it('should persist array values', () => {
+  it('should persist array values', async () => {
     const ref = usePersistedRef('test-array', [1, 2, 3])
     ref.value = [4, 5, 6]
+    await waitPersist()
 
     const ref2 = usePersistedRef('test-array', [1, 2, 3])
     expect(ref2.value).toEqual([4, 5, 6])
   })
 
-  it('should handle boolean values', () => {
+  it('should handle boolean values', async () => {
     const ref = usePersistedRef('test-bool', false)
     ref.value = true
+    await waitPersist()
 
     const ref2 = usePersistedRef('test-bool', false)
     expect(ref2.value).toBe(true)

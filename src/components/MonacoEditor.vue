@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import type * as Monaco from 'monaco-editor'
+import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api.js'
 import { useColorMode, useDebounceFn } from '@vueuse/core'
 import { applyChineseLocale } from '@/utils/monaco'
 
@@ -29,13 +29,50 @@ let modifiedModel: Monaco.editor.ITextModel | null = null
 let disposed = false
 let preventUpdateFromProps = false // 防止 props 更新时的循环触发
 const colorMode = useColorMode()
+let monacoPromise: Promise<typeof Monaco> | null = null
+let typeScriptContributionPromise: Promise<unknown> | null = null
+const languageContributionPromises = new Map<string, Promise<unknown>>()
 
 function getTheme() {
   return colorMode.value === 'dark' ? 'vs-dark' : 'vs'
 }
 
+async function loadMonaco() {
+  monacoPromise ??= Promise.all([
+    import('monaco-editor/esm/vs/editor/editor.api.js'),
+  ]).then(([monaco]) => monaco as typeof Monaco)
+
+  return monacoPromise
+}
+
+function loadTypeScriptContribution() {
+  typeScriptContributionPromise ??= import('monaco-editor/esm/vs/language/typescript/monaco.contribution.js')
+  return typeScriptContributionPromise
+}
+
+function loadLanguageContribution(language: string | undefined, richLanguageService = false) {
+  const key = `${language || 'text'}:${richLanguageService ? 'rich' : 'basic'}`
+  const existing = languageContributionPromises.get(key)
+  if (existing) return existing
+
+  const promise = (() => {
+    if (language === 'json') return import('monaco-editor/esm/vs/language/json/monaco.contribution.js')
+    if (language === 'markdown') return import('monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js')
+    if (language === 'javascript' || language === 'typescript') {
+      return richLanguageService
+        ? loadTypeScriptContribution()
+        : import('monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution.js')
+    }
+    return Promise.resolve()
+  })()
+
+  languageContributionPromises.set(key, promise)
+  return promise
+}
+
 onMounted(async () => {
-  const monaco = await import('monaco-editor')
+  const monaco = await loadMonaco()
+  await loadLanguageContribution(props.language)
   monacoApi = monaco
   applyChineseLocale()
   if (disposed || !containerRef.value) return
@@ -181,7 +218,11 @@ function getEditor() {
   return editorInstance
 }
 
-defineExpose({ getEditor })
+async function ensureRichLanguageService() {
+  await loadLanguageContribution(props.language, true)
+}
+
+defineExpose({ getEditor, ensureRichLanguageService })
 </script>
 
 <template>
